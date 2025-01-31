@@ -22,9 +22,17 @@ def get_basic_mask():
     mask = ~np.isin(labeling, masked_labels)
     return mask, labeling_noParcel
 
-def cleanTS(sub, ses =1, runs = range(1, 7),space = 'fsaverage5', bids_folder='/Users/mrenke/data/ds-dnumrisk', task ='numrisk'): #  'magjudge'
+def cleanTS(sub, ses =1, task ='magjudge',runs = range(1, 7),space = 'fsaverage5', bids_folder='/Users/mrenke/data/ds-dnumrisk'): #  'magjudge'
     # load in data as timeseries and regress out confounds (for each run sepeprately)
-    fmriprep_folder = op.join(bids_folder,'derivatives', 'fmriprep', f'sub-{sub}', 'func') # f'ses-{ses}', 
+    if bids_folder.endswith('ds-smile1'):
+        study = 'smile1'
+        if task == 'magjudge':
+            runs = range(1, 4)
+        elif task =='rest':
+            runs = [1]
+    elif bids_folder.endswith('ds-numrisk'):
+        study = 'miguel'
+
     fmriprep_confounds_include = ['global_signal', 'dvars', 'framewise_displacement', 'trans_x',
                                     'trans_y', 'trans_z', 'rot_x', 'rot_y', 'rot_z',
                                     'a_comp_cor_00', 'a_comp_cor_01', 'a_comp_cor_02', 'a_comp_cor_03', 'cosine00', 'cosine01', 'cosine02'
@@ -32,39 +40,46 @@ def cleanTS(sub, ses =1, runs = range(1, 7),space = 'fsaverage5', bids_folder='/
     number_of_vertices = 20484 if space == 'fsaverage5' else sys.exit("currently only space='fsaverage5'implemented ")
     clean_ts_runs = np.empty([number_of_vertices,0])
     for run in runs: # loop over runs and concatenate timeseries
-        try:
+        #try:
             timeseries = [None] * 2
             for i, hemi in enumerate(['L', 'R']):
-                filename_pattern = op.join(fmriprep_folder, f"sub-{sub}_task-{task}_acq-*_run-{run}_space-{space}_hemi-{hemi}.func.gii")
-                #filename =  op.join(fmriprep_folder, f'sub-{sub}_task-{task}_acq-{run+2}_run-{run}_space-{space}_hemi-{hemi}.func.gii')   #_ses-{ses}
-                #timeseries[i] = nib.load(filename).agg_data()
-                timeseries[i] = nib.load(glob.glob(filename_pattern)[0]).agg_data()
-
+                if study == 'smile1':
+                    fmriprep_folder = op.join(bids_folder,'derivatives', 'fmriprep', f'sub-{sub}', f'ses-{ses}', 'func') # f'ses-{ses}', 
+                    filename =  op.join(fmriprep_folder, f'sub-{sub}_ses-{ses}_task-{task}_run-{run}_space-{space}_hemi-{hemi}_bold.func.gii')   #_ses-{ses}
+                    timeseries[i] = nib.load(filename).agg_data()
+                elif study == 'miguel':
+                    fmriprep_folder = op.join(bids_folder,'derivatives', 'fmriprep', f'sub-{sub}', 'func') # f'ses-{ses}', 
+                    filename_pattern = op.join(fmriprep_folder, f"sub-{sub}_task-{task}_acq-*_run-{run}_space-{space}_hemi-{hemi}.func.gii")
+                    timeseries[i] = nib.load(glob.glob(filename_pattern)[0]).agg_data()
             timeseries = np.vstack(timeseries) # (20484, 135)
-            fmriprep_confounds_filename_pattern = op.join(fmriprep_folder, f"sub-{sub}_task-{task}_acq-*_run-{run}_desc-confounds_regressors.tsv")
-            #fmriprep_confounds_file = op.join(fmriprep_folder,f'sub-{sub}_task-{task}_run-{run}_desc-confounds_regressors.tsv') # _ses-{ses} timeseries
-            #fmriprep_confounds = pd.read_table(fmriprep_confounds_file)[fmriprep_confounds_include] 
-            fmriprep_confounds = pd.read_table(glob.glob(fmriprep_confounds_filename_pattern)[0])[fmriprep_confounds_include] 
+
+            # confounds
+            if study == 'smile1':
+                fmriprep_confounds_file = op.join(fmriprep_folder,f'sub-{sub}_ses-{ses}_task-{task}_run-{run}_desc-confounds_timeseries.tsv') # _ses-{ses} timeseries
+                fmriprep_confounds = pd.read_table(fmriprep_confounds_file)[fmriprep_confounds_include] 
+            elif study == 'miguel':
+                fmriprep_confounds_filename_pattern = op.join(fmriprep_folder, f"sub-{sub}_task-{task}_acq-*_run-{run}_desc-confounds_regressors.tsv")
+                fmriprep_confounds = pd.read_table(glob.glob(fmriprep_confounds_filename_pattern)[0])[fmriprep_confounds_include] 
             fmriprep_confounds= fmriprep_confounds.bfill()
 
             regressors_to_remove = fmriprep_confounds # remove_task_effects not implemented here (check dnumrisk)
             clean_ts = signal.clean(timeseries.T, confounds=regressors_to_remove).T
             clean_ts_runs = np.append(clean_ts_runs, clean_ts, axis=1)
-        except:
-            print(f'sub-{sub}, run-{run} makes problems') # (prob. confounds ts not there){fmriprep_confounds_file} \n skipping that run') # for sub 5,47,53,62
+        #except:
+            #print(f'sub-{sub}, run-{run} makes problems') # (prob. confounds ts not there){fmriprep_confounds_file} \n skipping that run') # for sub 5,47,53,62
 
     return clean_ts_runs
 
-def fit_correlation_matrix_unfiltered(sub,bids_folder):
+def fit_correlation_matrix_unfiltered(sub,ses,task,bids_folder):
     mask, labeling_noParcel = get_basic_mask()
-    clean_ts = cleanTS(sub, bids_folder=bids_folder) # checks if fsav5-file exists, if not, creates it
+    clean_ts = cleanTS(sub,ses,task,bids_folder=bids_folder) # checks if fsav5-file exists, if not, creates it
     seed_ts = clean_ts[mask]
 
     from nilearn.connectome import ConnectivityMeasure
     correlation_measure = ConnectivityMeasure(kind='correlation')
     cm = correlation_measure.fit_transform([seed_ts.T])[0] #correlation_matrix_noParcel
-    print(f'sub-{sub}: raw connectivity matrix estimated')    
-    np.save(op.join(bids_folder, 'derivatives', 'correlation_matrices', f'sub-{sub}_unfiltered.npy'), cm)
+    print(f'sub-{sub} ses-{ses} task-{task}: raw connectivity matrix estimated')    
+    np.save(op.join(bids_folder, 'derivatives', 'correlation_matrices', f'sub-{sub}_ses-{ses}_task-{task}_CM-unfiltered.npy'), cm)
 
 # ATLAS stuff
 
