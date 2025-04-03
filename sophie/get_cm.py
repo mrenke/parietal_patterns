@@ -27,8 +27,9 @@ stim_duration = 3  # in seconds
 TR = 2.3  # Repetition Time in seconds (sampling rate)
 n_components = 3
 
-def main(sub, bids_folder):
-    target_folder = op.join(bids_folder, 'derivatives_02', 'correlation_matrices')
+def main(sub, bids_folder_input, bids_folder_output):
+    sub = f'{int(sub):02d}'
+    target_folder = op.join(bids_folder_output, 'derivatives', 'correlation_matrices')
     os.makedirs(target_folder, exist_ok=True)
     #target_folder_gm = op.join(bids_folder, 'derivatives_02', 'gradients')
 
@@ -38,7 +39,7 @@ def main(sub, bids_folder):
     print(f'size of mask: {mask.shape}')
 
     # Get the cleaned time series for all types
-    stimulus_1_combined, stimulus_2_combined, remaining_combined = cleanTS(sub, ses=ses, bids_folder=bids_folder, stim_duration=stim_duration, TR=TR)
+    stimulus_1_combined, stimulus_2_combined, remaining_combined = cleanTS(sub, ses=ses, bids_folder=bids_folder_input, stim_duration=stim_duration, TR=TR)
 
     ts_types = {
         'stimulus_1': stimulus_1_combined,
@@ -51,19 +52,25 @@ def main(sub, bids_folder):
     for ts_type, clean_ts in ts_types.items():
         seed_ts = clean_ts[mask]
         correlation_measure = ConnectivityMeasure(kind='correlation')
-        np.save(op.join(target_folder_mask, f'sub-{sub}_ses-{ses}_unfiltered_{ts_type}_space-fsav5.npy'), correlation_measure)
-        print(f'raw connectivity matrix estimated for {ts_type}')
+        
+        # Compute the correlation matrix
+        correlation_matrix = correlation_measure.fit_transform([seed_ts.T])[0]  # fit_transform returns a list of matrices
+        
+        # Save the computed correlation matrix
+        np.save(op.join(target_folder, f'sub-{sub}_ses-{ses}_unfiltered_{ts_type}_space-fsav5.npy'), correlation_matrix)
+        print(f'Raw connectivity matrix estimated and saved for {ts_type}')
 
 
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('subject', default=None)
-    parser.add_argument('--bids_folder', default='/mnt_03/ds-dnumrisk')
+    parser.add_argument('--bids_folder_input', default='/mnt_03/ds-dnumrisk')
+    parser.add_argument('--bids_folder_output', default='/mnt_AdaBD_largefiles/Data/SMILE_DATA/DNumRisk/ds-dnumrisk')
 
 
 
     cmd_args = parser.parse_args()
 
-    main(cmd_args.subject, cmd_args.bids_folder, 
+    main(cmd_args.subject, cmd_args.bids_folder_input, cmd_args.bids_folder_output
           )
