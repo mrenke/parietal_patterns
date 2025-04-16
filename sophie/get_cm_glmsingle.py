@@ -26,7 +26,7 @@ ses = 1
 
 def main(sub, bids_folder_input, bids_folder_output, stim):
     sub = f'{int(sub):02d}'
-    target_folder = op.join(bids_folder_output, 'derivatives', f'correlation_matrices_stimulus-{stim}.glmsingle')
+    target_folder = op.join(bids_folder_output, 'derivatives', f'correlation_matrices.glmsingle')
     os.makedirs(target_folder, exist_ok=True)
 
     hemi_combined = [None] * 2
@@ -34,7 +34,7 @@ def main(sub, bids_folder_input, bids_folder_output, stim):
         filename = op.join(bids_folder_input, f'glm_stim{stim}.denoise', f'sub-{sub}', f'ses-{ses}', 'func', f'sub-{sub}_ses-1_task-magjudge_space-fsaverage5_stim-{stim}_hemi-{hemi}.func.gii')        
         hemi_combined[i] = nib.load(filename).agg_data()
     print(f"Hemisphere {hemi} shape: {hemi_combined[i].shape}")
-    hemi_combined = np.concatenate(hemi_combined) #instead of np.vstack?
+    hemi_combined = np.vstack(hemi_combined)
 
     # Build Destrieux parcellation and mask
     mask, labeling_noParcel = get_basic_mask()
@@ -51,7 +51,7 @@ def main(sub, bids_folder_input, bids_folder_output, stim):
     
     # Save the computed correlation matrix
     np.save(op.join(target_folder, f'sub-{sub}_ses-{ses}_stimulus-{stim}_betas_space-fsav5.npy'), correlation_matrix)
-    print(f'Raw connectivity matrix estimated and saved for {stim}')
+    print(f'Raw connectivity matrix estimated and saved for sub {sub} and stim {stim}')
 
 
 if __name__ == '__main__':

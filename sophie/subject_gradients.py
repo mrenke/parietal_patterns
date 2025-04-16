@@ -28,7 +28,7 @@ def main(sub,ses,bids_folder_cm, specification='', n_components=10):
         #CM unfiltered generated before?
         cm_file = op.join(bids_folder_cm, 'derivatives', 'correlation_matrices', f'sub-{sub}_ses-{ses}_unfiltered_{stim}_space-fsav5.npy')
         if (os.path.exists(cm_file) == False):
-            fit_correlation_matrix_unfiltered(sub,bids_folder = '/mnt_03/ds-dnumrisk')
+            fit_correlation_matrix_unfiltered(sub,bids_folder = '/mnt_03/ds-dnumrisk')#,ts_type=stim)
         cm = np.load(cm_file)
 
         # filter out nodes that are not connected to the rest

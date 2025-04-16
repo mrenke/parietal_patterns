@@ -10,57 +10,21 @@ from tqdm import tqdm
 from nipype.interfaces.freesurfer import SurfaceTransform
 from nilearn.maskers import NiftiMasker
 
-#def transform_fsaverage(in_file, fs_hemi, source_subject, bids_folder, target_space = 'fsaverage5'):
-#
-#        subjects_dir = op.join(bids_folder, 'derivatives', 'freesurfer')
-#
-#        sxfm = SurfaceTransform(subjects_dir=subjects_dir)
-#        sxfm.inputs.source_file = in_file
-#        sxfm.inputs.out_file = in_file.replace('fsnative', target_space)
-#        sxfm.inputs.source_subject = source_subject
-#        sxfm.inputs.target_subject = target_space
-#        sxfm.inputs.hemi = fs_hemi
-#
-#        r = sxfm.run()
-#        return r
-
-# Transform to fsaverage space while preserving the time dimension
-# in_file, fs_hemi, source_subject, bids_folder, target_space = 'fsaverage5', time_dim=180
-
-def transform_fsaverage(in_file, fs_hemi, source_subject, bids_folder, target_space = 'fsaverage5', time_dim=180):
+def transform_fsaverage(in_file, fs_hemi, source_subject, bids_folder, target_space = 'fsaverage5'):
 
         subjects_dir = op.join(bids_folder, 'derivatives', 'freesurfer')
 
+        sxfm = SurfaceTransform(subjects_dir=subjects_dir)
+        sxfm.inputs.source_file = in_file
+        sxfm.inputs.out_file = in_file.replace('fsnative', target_space)
+        sxfm.inputs.source_subject = source_subject
+        sxfm.inputs.target_subject = target_space
+        sxfm.inputs.hemi = fs_hemi
 
-        # Load the original data
-        original_data = nb.load(target_fn).agg_data()
-        print(f"Original data shape: {original_data.shape}")
+        r = sxfm.run()
+        return r
 
-        # Prepare an array to store the transformed data
-        transformed_data = np.zeros((163842, time_dim))  # 163842 vertices for fsaverage
 
-        # Loop over each time point and transform it
-        for t in range(time_dim):
-            # Save the current time point as a temporary GIFTI file
-            temp_fn = target_fn.replace('.func.gii', f'_temp_t{t}.func.gii')
-            im = nb.gifti.GiftiImage(darrays=[nb.gifti.GiftiDataArray(original_data[:, t].astype('float32'))])
-            nb.save(im, temp_fn)
-
-            # Transform the temporary file to fsaverage space
-            sxfm = SurfaceTransform(subjects_dir=subjects_dir)
-            sxfm.inputs.source_file = temp_fn
-            sxfm.inputs.out_file = in_file.replace('fsnative', target_space)
-            sxfm.inputs.source_subject = source_subject
-            sxfm.inputs.target_subject = target_space
-            sxfm.inputs.hemi = fs_hemi
-            sxfm.run()
-
-            # Load the transformed file and store the data
-            transformed_file = sxfm.inputs.out_file
-            transformed_data[:, t] = nb.load(transformed_file).agg_data()
-
-        print(f"Transformed data shape: {transformed_data.shape}")
-        return transformed_data
 
 def main(subject_id, session,stim, bids_folder):
     
@@ -87,7 +51,12 @@ def main(subject_id, session,stim, bids_folder):
         samples = surface.vol_to_surf(betas_it, surfinfo[hemi]['outer'], inner_mesh=surfinfo[hemi]['inner'])
         fs_hemi = 'lh' if hemi == 'L' else 'rh'
 
-        im = nb.gifti.GiftiImage(darrays=[nb.gifti.GiftiDataArray(samples.astype('float32'))]) #added the as.type('float32') to avoid error
+        darrays = [nb.gifti.GiftiDataArray(samples[:, ix].astype('float32')) for ix in range(samples.shape[1])]
+        im = nb.gifti.GiftiImage(darrays=darrays)
+
+        for da in im.darrays:
+            da.intent = nb.nifti1.intent_codes['NIFTI_INTENT_TIME_SERIES']
+
         target_fn = op.join(target_dir, f'sub-{subject}_ses-{session}_task-magjudge_space-fsnative_stim-{stim}_hemi-{hemi}.func.gii')
         nb.save(im, target_fn)
 
