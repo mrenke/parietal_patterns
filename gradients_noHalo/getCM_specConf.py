@@ -24,15 +24,16 @@ for param in base_params: # add derivative1 and power2 to all realignment parame
 
 
 
-def cleanTS(sub, ses =1, task ='magjudge',runs = range(1, 7),space = 'fsaverage5', bids_folder='/mnt_03/ds-dnumrisk', fmriprep_confounds_include = fmriprep_confounds_include): #  'magjudge'
+def cleanTS(sub, ses =1, task ='magjudge',runs = range(1, 7),space = 'fsaverage5', bids_folder='/Users/mrenke/data/ds-dnumrisk', 
+        fmriprep_confounds_include = fmriprep_confounds_include, scrubbing=False, scrub_thresh= 0.3, TR=2.3): #  'magjudge'
     print(fmriprep_confounds_include)
+    fmriprep_folder = op.join(bids_folder,'derivatives', 'fmriprep', f'sub-{sub}', f'ses-{ses}', 'func') # f'ses-{ses}', 
 
     number_of_vertices = 20484
     clean_ts_runs = np.empty([number_of_vertices,0])
     for run in runs:
         timeseries = [None] * 2
         for i, hemi in enumerate(['L', 'R']):  
-            fmriprep_folder = op.join(bids_folder,'derivatives', 'fmriprep', f'sub-{sub}', f'ses-{ses}', 'func') # f'ses-{ses}', 
             filename =  op.join(fmriprep_folder, f'sub-{sub}_ses-{ses}_task-{task}_run-{run}_space-{space}_hemi-{hemi}_bold.func.gii')   #_ses-{ses}
             timeseries[i] = nib.load(filename).agg_data()        
         timeseries = np.vstack(timeseries) # (20484, N_timepoints)
@@ -40,17 +41,27 @@ def cleanTS(sub, ses =1, task ='magjudge',runs = range(1, 7),space = 'fsaverage5
         fmriprep_confounds_file = op.join(fmriprep_folder,f'sub-{sub}_ses-{ses}_task-{task}_run-{run}_desc-confounds_timeseries.tsv') # _ses-{ses} timeseries
         fmriprep_confounds = pd.read_table(fmriprep_confounds_file)[fmriprep_confounds_include] 
         fmriprep_confounds= fmriprep_confounds.bfill()
-        clean_ts = signal.clean(timeseries.T, confounds=fmriprep_confounds).T
+
+        if scrubbing:
+            print('performing scrubbing with threshold', scrub_thresh)
+            sample_mask = (pd.read_table(fmriprep_confounds_file)['framewise_displacement'] < scrub_thresh).to_numpy()
+            print(f'removed {np.sum(sample_mask == False)} frames')
+            clean_ts = signal.clean(timeseries.T, confounds=fmriprep_confounds, sample_mask=sample_mask, t_r = TR, standardize='zscore_sample').T
+        else:
+            clean_ts = signal.clean(timeseries.T, confounds=fmriprep_confounds, t_r = TR, standardize='zscore_sample').T
+
         clean_ts_runs = np.append(clean_ts_runs, clean_ts, axis=1)
     return clean_ts_runs
 
 cc_filter= False
 
-def main(sub, bids_folder_in, bids_folder_out, ses=1, task='magjudge', confspec='36P'):  
+def main(sub, bids_folder_in, bids_folder_out, ses=1, task='magjudge', confspec='36P', scrubbing=True, scrub_thresh=0.3):  
     sub = f'{int(sub):02d}'
-    specification = confspec
+    if scrubbing:
+        confspec += f'scrub{str(scrub_thresh)[2]}'
 
-    clean_ts = cleanTS(sub, bids_folder=bids_folder_in)
+    clean_ts = cleanTS(sub, bids_folder=bids_folder_in, 
+                scrubbing=scrubbing, fmriprep_confounds_include=fmriprep_confounds_include, scrub_thresh=scrub_thresh)    
     mask, labeling_noParcel = get_basic_mask()
     seed_ts = clean_ts[mask]
 
