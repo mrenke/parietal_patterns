@@ -22,58 +22,27 @@ def get_basic_mask():
     mask = ~np.isin(labeling, masked_labels)
     return mask, labeling_noParcel
 
+def get_NPC_mask(bids_folder_orig = '/mnt_03/ds-dnumrisk', space = 'fsaverage5'):
+    surf_mask_L = op.join(bids_folder_orig, 'derivatives/surface_masks', f'desc-NPC_L_space-{space}_hemi-lh.label.gii')
+    surf_mask_L = nib.load(surf_mask_L).agg_data()
+    surf_mask_R = op.join(bids_folder_orig, 'derivatives/surface_masks', f'desc-NPC_R_space-{space}_hemi-rh.label.gii')
+    surf_mask_R = nib.load(surf_mask_R).agg_data()
+    nprf_r2 = np.concatenate((surf_mask_L, surf_mask_R))
 
+    nprf_r2 = np.bool_(nprf_r2)
+    return nprf_r2
 
-def cleanTS(sub, ses =1, task ='magjudge',runs = range(1, 7),space = 'fsaverage5', bids_folder='/Users/mrenke/data/ds-dnumrisk'): #  'magjudge'
-    # load in data as timeseries and regress out confounds (for each run sepeprately)
-    if bids_folder.endswith('ds-smile1'):
-        study = 'smile1'
-        if task == 'magjudge':
-            runs = range(1, 4)
-        elif task =='rest':
-            runs = [1]
-    elif bids_folder.endswith('ds-numrisk'):
-        study = 'miguel'
-    elif bids_folder.endswith('ds-dnumrisk'):
-        study = 'dyscalc'
+def get_glasser_parcels(base_folder='/mnt_03/diverse_neuralData/atlases_parcellations', space='fsaverage'):
+    atlas_left = nib.load(op.join(base_folder,f'lh_space-{space}.HCPMMP1.gii')).agg_data()
+    atlas_right =  nib.load(op.join(base_folder,f'rh_space-{space}.HCPMMP1.gii')).agg_data()
 
-    fmriprep_confounds_include = ['global_signal', 'dvars', 'framewise_displacement', 'trans_x',
-                                    'trans_y', 'trans_z', 'rot_x', 'rot_y', 'rot_z',
-                                    'a_comp_cor_00', 'a_comp_cor_01', 'a_comp_cor_02', 'a_comp_cor_03', 'cosine00', 'cosine01', 'cosine02'
-                                    ] # 
-    number_of_vertices = 20484 if space == 'fsaverage5' else sys.exit("currently only space='fsaverage5'implemented ")
-    clean_ts_runs = np.empty([number_of_vertices,0])
-    for run in runs: # loop over runs and concatenate timeseries
-        #try:
-            timeseries = [None] * 2
-            for i, hemi in enumerate(['L', 'R']):
-                if study == 'smile1' or study == 'dyscalc':
-                    fmriprep_folder = op.join(bids_folder,'derivatives', 'fmriprep', f'sub-{sub}', f'ses-{ses}', 'func') # f'ses-{ses}', 
-                    filename =  op.join(fmriprep_folder, f'sub-{sub}_ses-{ses}_task-{task}_run-{run}_space-{space}_hemi-{hemi}_bold.func.gii')   #_ses-{ses}
-                    timeseries[i] = nib.load(filename).agg_data()
-                elif study == 'miguel':
-                    fmriprep_folder = op.join(bids_folder,'derivatives', 'fmriprep', f'sub-{sub}', 'func') # f'ses-{ses}', 
-                    filename_pattern = op.join(fmriprep_folder, f"sub-{sub}_task-{task}_acq-*_run-{run}_space-{space}_hemi-{hemi}.func.gii")
-                    timeseries[i] = nib.load(glob.glob(filename_pattern)[0]).agg_data()
-            timeseries = np.vstack(timeseries) # (20484, 135)
+    labeling = np.concatenate([(atlas_left+1000), (atlas_right+2000)]) # unique labels for left and right!
+    mask = ~np.isin(labeling, [1000,2000]) # non-cortex region (unknow and medial wall) have label 0, hence 1000 & 2000 in my variation labels L/R
+    # mask.sum() == len(labeling[(labeling != 1000) & (labeling != 2000)]) 
+    return mask, labeling
 
-            # confounds
-            if study == 'smile1' or study == 'dyscalc':
-                fmriprep_confounds_file = op.join(fmriprep_folder,f'sub-{sub}_ses-{ses}_task-{task}_run-{run}_desc-confounds_timeseries.tsv') # _ses-{ses} timeseries
-                fmriprep_confounds = pd.read_table(fmriprep_confounds_file)[fmriprep_confounds_include] 
-            elif study == 'miguel':
-                fmriprep_confounds_filename_pattern = op.join(fmriprep_folder, f"sub-{sub}_task-{task}_acq-*_run-{run}_desc-confounds_regressors.tsv")
-                fmriprep_confounds = pd.read_table(glob.glob(fmriprep_confounds_filename_pattern)[0])[fmriprep_confounds_include] 
-            fmriprep_confounds= fmriprep_confounds.bfill()
-
-            regressors_to_remove = fmriprep_confounds # remove_task_effects not implemented here (check dnumrisk)
-            clean_ts = signal.clean(timeseries.T, confounds=regressors_to_remove).T
-            clean_ts_runs = np.append(clean_ts_runs, clean_ts, axis=1)
-        #except:
-            #print(f'sub-{sub}, run-{run} makes problems') # (prob. confounds ts not there){fmriprep_confounds_file} \n skipping that run') # for sub 5,47,53,62
-
-    return clean_ts_runs
-
+# defined and used in getCM_specConf.py
+#def cleanTS(sub, ses =1, task ='magjudge',runs = range(1, 7),space = 'fsaverage5', bids_folder='/Users/mrenke/data/ds-dnumrisk'): #  'magjudge'
 
 # plotting gradients
 
@@ -117,3 +86,4 @@ def npFileTofsLRGii(sub, specification='',bids_folder='/Users/mrenke/data/ds-dnu
             out_file = op.join(target_dir, f'sub-{sub}_task-{task}_space-{target_space}_hemi-{hemi}_grad{n_grad}{specification}.surf.gii') # _ses-{ses}
             nib.save(gii_im_fslr[0],out_file)
             print(f'saved to {out_file}')
+

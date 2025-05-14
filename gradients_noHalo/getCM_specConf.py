@@ -24,7 +24,11 @@ def cleanTS(sub, fmriprep_confounds_include, bids_folder,
     print(fmriprep_confounds_include)
     fmriprep_folder = op.join(bids_folder,'derivatives', 'fmriprep', f'sub-{sub}', f'ses-{ses}', 'func') # f'ses-{ses}', 
 
-    number_of_vertices = 20484
+    if space == 'fsaverage5':
+        number_of_vertices = 20484 
+    elif space == 'fsaverage':
+        number_of_vertices = 327684
+
     clean_ts_runs = np.empty([number_of_vertices,0])
     N_valid_runs = 0
     for run in runs:
@@ -62,12 +66,13 @@ def cleanTS(sub, fmriprep_confounds_include, bids_folder,
             else:
                 clean_ts = signal.clean(timeseries.T, confounds=fmriprep_confounds, t_r = TR, standardize='zscore_sample').T
                 clean_ts_runs = np.append(clean_ts_runs, clean_ts, axis=1)
-
-            if N_valid_runs < runs_per_sub_thresh:
-                print(f'sub-{sub} has {N_valid_runs} valid runs, not usable')
         except Exception as e:
             print(f"Error processing run {run} for sub-{sub}: {e} \nSkipping this run.")
             #print(f'sub-{sub}, run-{run} makes problems') # (prob. confounds ts not there){fmriprep_confounds_file} \n skipping that run') # for sub 5,47,53,62
+        
+    if N_valid_runs < runs_per_sub_thresh:
+        print(f'sub-{sub} has {N_valid_runs} valid runs, not usable')
+        
     return clean_ts_runs, N_valid_runs
 
 cc_filter= False
