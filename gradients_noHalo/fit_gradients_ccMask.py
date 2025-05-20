@@ -87,7 +87,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('subject', default=None, type=int)
-    parser.add_argument('--confspec', default='36P')
+    parser.add_argument('--confspec', default='32P')
     parser.add_argument('--bids_folder', default='/mnt_AdaBD_largefiles/Data/SMILE_DATA/DNumRisk/ds-dnumrisk')
     #parser.add_argument('--specification', default='')
 
