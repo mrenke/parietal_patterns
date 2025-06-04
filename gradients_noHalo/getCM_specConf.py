@@ -14,17 +14,25 @@ from nilearn.connectome import ConnectivityMeasure
  # 36P, scrubbing, frames_per_run_thresh, BP-filtering
 runs_per_sub_thresh = 2
 
-
 def cleanTS(sub, fmriprep_confounds_include, bids_folder, 
         TR=2.3, ses =1, task ='magjudge',runs = range(1, 7),space = 'fsaverage5',
         scrubbing=True, scrub_thresh= 0.3,
         run_FD_filter = True, frames_per_run_thresh=104,
-        bp_filtering=True, lower_bpf=0.01, upper_bpf=0.08): #  'magjudge'
+        bp_filtering=True, lower_bpf=0.01, upper_bpf=0.08): #  
 
     print(fmriprep_confounds_include)
     fmriprep_folder = op.join(bids_folder,'derivatives', 'fmriprep', f'sub-{sub}', f'ses-{ses}', 'func') # f'ses-{ses}', 
 
-    number_of_vertices = 20484
+    if space == 'fsaverage5':
+        number_of_vertices = 20484 
+    elif space == 'fsaverage':
+        number_of_vertices = 327684
+
+    if 'smile' in bids_folder and task == 'magjudge':
+        runs = range(1, 4) # only 3 runs in SMILE study
+    elif 'smile' in bids_folder and task == 'rest':
+        runs = [1] # only 1 run for rest in SMILE study
+
     clean_ts_runs = np.empty([number_of_vertices,0])
     N_valid_runs = 0
     for run in runs:
@@ -62,17 +70,18 @@ def cleanTS(sub, fmriprep_confounds_include, bids_folder,
             else:
                 clean_ts = signal.clean(timeseries.T, confounds=fmriprep_confounds, t_r = TR, standardize='zscore_sample').T
                 clean_ts_runs = np.append(clean_ts_runs, clean_ts, axis=1)
-
-            if N_valid_runs < runs_per_sub_thresh:
-                print(f'sub-{sub} has {N_valid_runs} valid runs, not usable')
         except Exception as e:
             print(f"Error processing run {run} for sub-{sub}: {e} \nSkipping this run.")
             #print(f'sub-{sub}, run-{run} makes problems') # (prob. confounds ts not there){fmriprep_confounds_file} \n skipping that run') # for sub 5,47,53,62
+        
+    #if N_valid_runs < runs_per_sub_thresh:
+    #    print(f'sub-{sub} has {N_valid_runs} valid runs, not usable')
+        
     return clean_ts_runs, N_valid_runs
 
 cc_filter= False
 
-def main(sub, bids_folder_in, bids_folder_out,  confspec='36P', ses=1, task='magjudge',
+def main(sub, bids_folder_in, bids_folder_out,  confspec='32P', ses=1, task='magjudge',
         scrubbing=True, scrub_thresh=0.3, 
         run_FD_filter=True, frames_per_run_thresh=104,
         bp_filtering=True, lower_bpf=0.01, upper_bpf=0.08):  
@@ -93,6 +102,7 @@ def main(sub, bids_folder_in, bids_folder_out,  confspec='36P', ses=1, task='mag
         fmriprep_confounds_include.append(param + '_derivative1_power2')
 
     clean_ts, N_valid_runs = cleanTS(sub,fmriprep_confounds_include=fmriprep_confounds_include, bids_folder=bids_folder_in, 
+                task=task, ses=ses, 
                 scrubbing=scrubbing,  scrub_thresh=scrub_thresh,
                 run_FD_filter=run_FD_filter, frames_per_run_thresh=frames_per_run_thresh,
                 bp_filtering=bp_filtering, lower_bpf=lower_bpf, upper_bpf=upper_bpf,
@@ -108,7 +118,7 @@ def main(sub, bids_folder_in, bids_folder_out,  confspec='36P', ses=1, task='mag
 
     correlation_measure = ConnectivityMeasure(kind='correlation')
     cm = correlation_measure.fit_transform([seed_ts.T])[0] #correlation_matrix_noParcel
-    fn = op.join(bids_folder_out, 'derivatives', 'correlation_matrices.tryNoHalo', f'sub-{sub}_ses-{ses}_task-magjudge_confspec-{confspec}_CM-unfiltered.npy')
+    fn = op.join(bids_folder_out, 'derivatives', 'correlation_matrices.tryNoHalo', f'sub-{sub}_ses-{ses}_task-{task}_confspec-{confspec}_CM-unfiltered.npy')
     np.save(fn, cm)
     print(f'sub-{sub} ses-{ses} task-{task} conf-{confspec}: raw connectivity matrix estimated & saved to {fn}')    
 
@@ -118,7 +128,11 @@ if __name__ == '__main__':
     parser.add_argument('subject', default=None)
     parser.add_argument('--bids_folder_input', default='/mnt_03/ds-dnumrisk')
     parser.add_argument('--bids_folder_output', default='/mnt_AdaBD_largefiles/Data/SMILE_DATA/DNumRisk/ds-dnumrisk')
-    parser.add_argument('--confspec', default='36P')
+    parser.add_argument('--confspec', default='32P')
+    parser.add_argument('--task', default='magjudge')
+    parser.add_argument('--ses', default=1, type=int)
     cmd_args = parser.parse_args()
     main(cmd_args.subject, cmd_args.bids_folder_input, cmd_args.bids_folder_output, 
-        confspec=cmd_args.confspec)
+        confspec=cmd_args.confspec,
+        task=cmd_args.task,
+        ses=cmd_args.ses)
