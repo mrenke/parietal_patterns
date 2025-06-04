@@ -40,7 +40,18 @@ def get_glasser_parcels(base_folder='/mnt_03/diverse_neuralData/atlases_parcella
     mask = ~np.isin(labeling, [1000,2000]) # non-cortex region (unknow and medial wall) have label 0, hence 1000 & 2000 in my variation labels L/R
     # mask.sum() == len(labeling[(labeling != 1000) & (labeling != 2000)]) 
     return mask, labeling
+def get_glasser_CAatlas_mapping(datadir = '/mnt_03/diverse_neuralData/atlases_parcellations/ColeAnticevicNetPartition'):
+    glasser_CAatlas_mapping = pd.read_csv(op.join(datadir,'cortex_parcel_network_assignments.txt'),header=None)
+    glasser_CAatlas_mapping.index.name = 'glasser_parcel'
+    glasser_CAatlas_mapping = glasser_CAatlas_mapping.rename({0:'ca_network'},axis=1)
 
+    CAatlas_names = pd.read_csv(op.join(datadir,'network_label-names.csv'),index_col=0)
+    CAatlas_names = CAatlas_names.set_index('Label Number')
+    CAatlas_names = CAatlas_names.sort_index(level='Label Number')
+    
+    return glasser_CAatlas_mapping, CAatlas_names
+
+    
 # defined and used in getCM_specConf.py
 #def cleanTS(sub, ses =1, task ='magjudge',runs = range(1, 7),space = 'fsaverage5', bids_folder='/Users/mrenke/data/ds-dnumrisk'): #  'magjudge'
 
