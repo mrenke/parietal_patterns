@@ -38,3 +38,66 @@ def get_glasser_CAatlas_mapping(datadir = '/mnt_03/diverse_neuralData/atlases_pa
     CAatlas_names = CAatlas_names.sort_index(level='Label Number')
     
     return glasser_CAatlas_mapping, CAatlas_names
+
+
+import numpy as np
+
+def resample_to_gaussian(connectome, mean=0.5, std=0.1):
+    """
+    Resample the nonzero elements of a structural connectome (DTI-based) 
+    to follow a Gaussian distribution with specified mean and std.
+    
+    Parameters:
+        connectome (np.ndarray): 2D square matrix of fiber strengths.
+        mean (float): Mean of the resampled Gaussian distribution.
+        std (float): Standard deviation of the resampled Gaussian distribution.
+    
+    Returns:
+        np.ndarray: Connectome with resampled fiber strengths.
+    """
+    conn = connectome.copy()
+    # Find the indices of the nonzero entries (assuming symmetry isn't enforced yet)
+    nonzero_indices = np.nonzero(conn)
+    values = conn[nonzero_indices]
+
+    # Sort original values and generate sorted Gaussian samples
+    sorted_indices = np.argsort(values)
+    sorted_values = values[sorted_indices]
+
+    # Generate sorted Gaussian random values
+    gaussian_samples = np.random.normal(loc=0.0, scale=1.0, size=len(sorted_values))
+    gaussian_samples_sorted = np.sort(gaussian_samples)
+
+    # Replace each original value with a sorted Gaussian sample
+    resampled_values = np.empty_like(values)
+    resampled_values[sorted_indices] = gaussian_samples_sorted
+
+    # Rescale to desired mean and std
+    resampled_values = mean + std * resampled_values
+
+    # Place back into the matrix
+    resampled_conn = np.zeros_like(conn)
+    resampled_conn[nonzero_indices] = resampled_values
+
+    return resampled_conn
+
+def get_parcel_infos(atlas_data,atlas_affine):
+    from scipy.ndimage import center_of_mass
+    import nibabel as nib
+
+    labels = np.unique(atlas_data)     # Get unique parcel labels 
+    labels = labels[labels != 0]       # (excluding 0, which is usually background)
+
+    coords = []
+    for label in labels:
+        mask = atlas_data == label  # Binary mask for the parcel
+
+        com_voxel = center_of_mass(mask)  # Center of mass in voxel space
+        com_mni = nib.affines.apply_affine(atlas_affine, com_voxel)  # Convert voxel indices to MNI space using affine
+        coords.append(com_mni)
+    coords = np.array(coords)
+
+    from scipy.spatial.distance import pdist, squareform
+    distances = squareform(pdist(coords, metric='euclidean')) 
+
+    return coords, distances
