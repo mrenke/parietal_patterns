@@ -22,20 +22,21 @@ def threshold_matrix(mat, proportion=0.1):
     mat[mat < thresh] = 0
     return mat
 
-def main(sub, confspec = '36Pscrub3BPfilter',
-        bids_folder = '/mnt_AdaBD_largefiles/Data/SMILE_Data/DNumRisk/ds-dnumrisk',
+def main(sub,bids_folder = '/mnt_AdaBD_largefiles/Data/SMILE_Data/DNumRisk/ds-dnumrisk',
+        confspec = '36Pscrub3BPfilter',
         thresh_conn = 0.1 ,
+        preferred_number_of_modules=None,
         ses=1, task='magjudge', specification=''):  
-            
+
     sub = f'{int(sub):02d}'
     source_folder = op.join(bids_folder, 'derivatives', 'correlation_matrices.tryNoHalo') # .parcel
     target_folder = op.join(bids_folder,'derivatives','networks_infomap')
     plot_folder = op.join(bids_folder,'plots_and_ims','networks_infomap')
     
-    fn_path = op.join(target_folder, f'sub-{sub}_module_mapping_infomap_hemi-{hemi}_thresh-{thresh_conn}_confspec-{confspec}.npy')
+    fn_path = op.join(target_folder, f'sub-{sub}_module_mapping_infomap_hemi-{hemi}_thresh-{thresh_conn}_prefNmod-{preferred_number_of_modules}_confspec-{confspec}.npy')
     if  op.exists(fn_path):
         print(f'Module mapping file already exists: {fn_path}. Skipping to plotting')
-        module_mapping = np.load(op.join(target_folder, f'sub-{sub}_module_mapping_infomap_hemi-{hemi}_thresh-{thresh_conn}_confspec-{confspec}.npy'))
+        module_mapping = np.load(fn_path)
 
     else:
         cm_file = op.join(source_folder,f'sub-{sub}_ses-1_task-magjudge_confspec-{confspec}runFD104-6runs_CM-unfiltered.npy')
@@ -74,7 +75,6 @@ def main(sub, confspec = '36Pscrub3BPfilter',
         from infomap import Infomap
 
         mat = cm_thresh
-        preferred_number_of_modules = 10  # Set your preferred number of modules here
 
         N = mat.shape[0]
         im = Infomap(preferred_number_of_modules=preferred_number_of_modules) # add flags like '--two-level' if needed
@@ -100,6 +100,7 @@ def main(sub, confspec = '36Pscrub3BPfilter',
         module_mapping = np.stack([all_nodes, full_module_mapping], axis=1)
         print(module_mapping.shape)
         np.save(fn_path, module_mapping)
+        print(f'successfully generate module mapping for sub {sub}, hemi {hemi}, thresh {thresh_conn}, confspec {confspec} \n saved to {fn_path}')
 
     modules_fsav5 = np.full(mask.shape[0], np.nan, dtype=float)
     modules_fsav5[mask] = module_mapping[:,1]
@@ -131,18 +132,21 @@ def main(sub, confspec = '36Pscrub3BPfilter',
         
     figure.subplots_adjust(wspace=0.01)
     figure.suptitle(f'sub {sub} \n thresh {thresh_conn}', y=0.9)
-    figure.savefig(op.join(plot_folder, f'sub-{sub}_hemi-{hemi}_thresh-{thresh_conn}_confspec-{confspec}.png'), dpi=300, bbox_inches='tight')   
 
+    fn_plot = op.join(plot_folder, f'sub-{sub}_hemi-{hemi}_thresh-{thresh_conn}_prefNmod-{preferred_number_of_modules}_confspec-{confspec}.png')
+    figure.savefig(fn_plot, dpi=300, bbox_inches='tight')   
     plt.close(figure)
-    print(f'Plot for sub {sub} saved to {op.join(plot_folder, f"sub-{sub}_hemi-{hemi}_thresh-{thresh_conn}_confspec-{confspec}.png")}')
+    print(f'Plot for sub {sub} saved to {fn_plot}')
 
 if __name__ == '__main__':  
     import argparse
 
     parser = argparse.ArgumentParser()
     parser.add_argument('subject', default=None, type=int)
+    parser.add_argument('--bids_folder', default='/mnt_AdaBD_largefiles/Data/SMILE_Data/DNumRisk/ds-dnumrisk', type=str, help='BIDS folder path')
     parser.add_argument('--confspec', default='36Pscrub3BPfilter', type=str, help='Configuration specification')
     parser.add_argument('--thresh_conn', default=0.1, type=float, help='Threshold for connection matrix')
+    parser.add_argument('--preferred_number_of_modules', default=None, type=int, help='Preferred number of modules for Infomap')
     args = parser.parse_args()
 
-    main(args.subject, confspec=args.confspec, thresh_conn=args.thresh_conn)    
+    main(args.subject, bids_folder=args.bids_folder, confspec=args.confspec, thresh_conn=args.thresh_conn, preferred_number_of_modules=args.preferred_number_of_modules)
