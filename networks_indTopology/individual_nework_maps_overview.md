@@ -6,6 +6,12 @@
 - Infomap algorithm for community detection
 
 
+## State
+
+- for sub 1 smallest thresh (0.02) gave all nets in parietal ROI/IPS (dorsalAttention, fronto-parietal, cinguloOpercular, DMN) 
+    - but for sub-04 & 07 thresh < 0.05 were very few nets.... 
+- can happen that small thresholds have very few modules, so we need to check if we have enough
+
 ### “consensus” assignment procedure [Gordon 2014 - Cortical Area Parcellation]
 with the goal of incorporating information both from more sparse thresholds, in which smaller networks were likely to emerge, and more dense thresholds, in which more parcels were likely to be successfully assigned. In this procedure, each node was given the community assignment it had at the sparsest possible threshold at which it was successfully assigned. The node assignments were “cleaned up” by removing small communities that were only present at one threshold. This procedure is nearly identical to the method used to collapse previously published voxel-wise community assignments (Power et al. 2011) across thresholds to create a single network map (the “Power communities” map described above). We note that this procedure does not attempt to comprehensively describe all features of the network, and may be especially poor at capturing nonhierarchical network features (which do occur infrequently). Rather, it provides a single, summary view of the brain’s networks.
 
