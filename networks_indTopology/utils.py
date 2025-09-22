@@ -50,3 +50,4 @@ def get_NPC_mask(bids_folder_orig = '/mnt_03/ds-dnumrisk', space = 'fsaverage5',
 
     nprf_r2 = np.bool_(nprf_r2)
     return nprf_r2
+
