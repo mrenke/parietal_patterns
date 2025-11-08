@@ -36,11 +36,12 @@ def main(subject, bids_folder, ses=1, task='magjudge', confspec='36P',
     print(f'Loading {sub_file} - \n sub {sub} had {n_runs} sufficient runs')
     cm = np.load(sub_file)
 
-    #if ztransf:
-    #    cm = np.arctanh(cm) # "....normalized the correlation coefficients using Fisher’s z-transformation -  
+    if ztransf:
+        cm = np.arctanh(cm) # "....normalized the correlation coefficients using Fisher’s z-transformation -  
+        cm[np.isinf(cm)] = 0
     # statistische Methode, die den Pearson-Korrelationskoeffizienten (\(r\)) in eine normalverteilte Variable (\(z^{\prime }\)) umwandel = its inverse hyperbolic tangent (artanh).
 
-    if kernel == None:
+    if kernel == None: # also needed for cosine I think
         print('Applying CC-mask for kernel=None')
         cc_mask_file = op.join(op.join(bids_folder, 'derivatives', f'gradients.{cm_confspec}', f'sub-{sub}'), f'sub-{sub}_cc-mask_space-fsaverag5.npy')
         mask_cc = np.load(cc_mask_file)
