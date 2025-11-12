@@ -20,7 +20,7 @@ from brainspace.utils.parcellation import map_to_labels, reduce_by_labels
 from  nilearn.datasets import fetch_surf_fsaverage
 import nilearn.plotting as nplt
 import matplotlib.pyplot as plt
-from numrisk.fmri_analysis.gradients.utils_old import get_events_confounds,surfTosurf
+from utils_old import get_events_confounds,surfTosurf
 
 ses = 1
 
@@ -31,7 +31,7 @@ def main(sub, bids_folder_input, bids_folder_output, stim):
 
     hemi_combined = [None] * 2
     for i, hemi in enumerate(['L', 'R']):
-        filename = op.join(bids_folder_input, f'glm_stim{stim}.denoise', f'sub-{sub}', f'ses-{ses}', 'func', f'sub-{sub}_ses-1_task-magjudge_space-fsaverage5_stim-{stim}_hemi-{hemi}.func.gii')        
+        filename = op.join(bids_folder_input, f'glm_stim.denoise', f'sub-{sub}', f'ses-{ses}', 'func', f'sub-{sub}_ses-1_task-magjudge_space-fsaverage5_stim-{stim}_hemi-{hemi}_transf.func.gii') #{stim}     
         hemi_combined[i] = nib.load(filename).agg_data()
     print(f"Hemisphere {hemi} shape: {hemi_combined[i].shape}")
     hemi_combined = np.vstack(hemi_combined)
@@ -50,7 +50,7 @@ def main(sub, bids_folder_input, bids_folder_output, stim):
     correlation_matrix = correlation_measure.fit_transform([seed_ts.T])[0]  # fit_transform returns a list of matrices
     
     # Save the computed correlation matrix
-    np.save(op.join(target_folder, f'sub-{sub}_ses-{ses}_stimulus-{stim}_betas_space-fsav5.npy'), correlation_matrix)
+    np.save(op.join(target_folder, f'sub-{sub}_ses-{ses}_stimulus-{stim}_betas_space-fsav5_transf.npy'), correlation_matrix)
     print(f'Raw connectivity matrix estimated and saved for sub {sub} and stim {stim}')
 
 
@@ -58,10 +58,9 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('subject', default=None)
-    parser.add_argument('--bids_folder_input', default='/mnt_03/ds-dnumrisk/derivatives')
-    parser.add_argument('--bids_folder_output', default='/mnt_AdaBD_largefiles/Data/SMILE_DATA/DNumRisk/ds-dnumrisk')
+    parser.add_argument('--bids_folder_input', default='/mnt_AdaBD_largefiles/Data/SMILE_DATA/DNumRisk/ds-numrisk/derivatives/')
+    parser.add_argument('--bids_folder_output', default='/mnt_AdaBD_largefiles/Data/SMILE_DATA/DNumRisk/ds-numrisk')
     parser.add_argument('--stim', default=1)
-
 
     cmd_args = parser.parse_args()
 
