@@ -51,7 +51,14 @@ def get_glasser_CAatlas_mapping(datadir = '/mnt_03/diverse_neuralData/atlases_pa
     
     return glasser_CAatlas_mapping, CAatlas_names
 
-    
+def get_fsav5_CAatlas_mapping():
+    mask_glasser, labeling_glasser = get_glasser_parcels(space = 'fsaverage5' )
+    glasser_CAatlas_mapping, CAatlas_names = get_glasser_CAatlas_mapping()
+    from brainspace.utils.parcellation import map_to_labels
+    CAatlas_fsav5 = map_to_labels(glasser_CAatlas_mapping['ca_network'].values , labeling_glasser, mask=mask_glasser) #, fill=np.nan) #grad_sub[n_grad-1]
+    return CAatlas_fsav5 #, glasser_CAatlas_mapping, CAatlas_names
+
+
 # defined and used in getCM_specConf.py
 #def cleanTS(sub, ses =1, task ='magjudge',runs = range(1, 7),space = 'fsaverage5', bids_folder='/Users/mrenke/data/ds-dnumrisk'): #  'magjudge'
 

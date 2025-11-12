@@ -50,3 +50,30 @@ def get_NPC_mask(bids_folder_orig = '/mnt_03/ds-dnumrisk', space = 'fsaverage5',
 
     nprf_r2 = np.bool_(nprf_r2)
     return nprf_r2
+
+def get_Gordon17_cmap():
+    import matplotlib.colors as mcolors
+    rgb = np.array(list(hcp.ca_network['rgba'].values())[1:])
+    grey = np.array([[0.5, 0.5, 0.5, 1.0]])  # RGBA format: grey with full opacity
+
+    custom_color_map = ListedColormap(np.vstack([grey, # 0: background
+                                                rgb[8], # 1: DMN
+                                                rgb[0], # 2: visual2
+                                                rgb[6], # 3: fronto parietal
+                                                mcolors.to_rgba('bisque'), #  4: visual 2
+                                                rgb[4],  # 5: dorsal attention
+                                                mcolors.to_rgba(mcolors.CSS4_COLORS['violet']),# 6: premotor
+                                                rgb[5], # 7 : language
+                                                mcolors.to_rgba('black'), # 8: salience
+                                                rgb[3], # 9: Cingulo opercular
+                                                rgb[2],# 10: motor - hand
+                                                mcolors.to_rgba(mcolors.CSS4_COLORS['orange']),  # 11: motor - mouth
+                                                rgb[7],# 12: auditory 
+                                                mcolors.to_rgba('steelblue'), # 13: anterior MTL ?
+                                                mcolors.to_rgba('palegreen'), # 14: posterior MTL
+                                                mcolors.to_rgba('blue'), # 15: par memory
+                                                mcolors.to_rgba('white'), # 16: context
+                                                mcolors.to_rgba(mcolors.CSS4_COLORS['green']) # 17: motor - foot
+                                                ])) 
+    
+    return custom_color_map
