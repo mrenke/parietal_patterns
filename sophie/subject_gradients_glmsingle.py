@@ -26,7 +26,7 @@ def main(sub,ses,bids_folder_cm, specification='', n_components=10):
         print(f'Processing stimulus: {stim}')       
 
         #CM unfiltered generated before?
-        cm_file = op.join(bids_folder_cm, 'derivatives', 'correlation_matrices.glmsingle', f'sub-{sub}_ses-{ses}_stimulus-{stim}_betas_space-fsav5.npy')
+        cm_file = op.join(bids_folder_cm, 'derivatives', 'correlation_matrices.glmsingle', f'sub-{sub}_ses-{ses}_stimulus-{stim}_betas_space-fsav5_transf.npy')
         if (os.path.exists(cm_file) == False):
             fit_correlation_matrix_unfiltered(sub,bids_folder = '/mnt_03/ds-dnumrisk')
         cm = np.load(cm_file)
