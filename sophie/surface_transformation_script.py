@@ -31,8 +31,8 @@ def main(subject_id, session,stim, bids_folder):
     sub = Subject(subject_id, bids_folder=bids_folder)
     subject = f'{int(subject_id):02d}'
 
-    key = f'glm_stim{stim}.denoise'
-    target_dir = op.join(bids_folder, 'derivatives', key , f'sub-{subject}', f'ses-{session}', 'func')
+    key = f'glm_stim{stim}.denoise' #
+    target_dir = op.join('/mnt_AdaBD_largefiles/Data/SMILE_Data/DNumRisk/ds-numrisk/', 'derivatives', key , f'sub-{subject}', f'ses-{session}', 'func')
 
     surfinfo = sub.get_surf_info_fs()
 
@@ -67,8 +67,10 @@ if __name__ == '__main__':
     parser.add_argument('subject', default=None)
     parser.add_argument('--session', default=1)
     parser.add_argument('--stim', default=1)
-    parser.add_argument('--bids_folder', default='/mnt_03/ds-dnumrisk')
+    parser.add_argument('--bids_folder', default='/mnt_04/ds-numrisk')
 
     args = parser.parse_args()
 
     main(args.subject, args.session, args.stim,bids_folder=args.bids_folder) # ,denoise=args.denoise
+
+    
