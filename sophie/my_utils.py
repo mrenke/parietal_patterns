@@ -15,7 +15,7 @@ from brainspace.utils.parcellation import map_to_labels
 from  nilearn.datasets import fetch_surf_fsaverage
 import nilearn.plotting as nplt
 import matplotlib.pyplot as plt
-from numrisk.fmri_analysis.gradients.utils_old import get_events_confounds,surfTosurf
+from utils_old import get_events_confounds,surfTosurf
 
 def cleanTS(sub, ses =1, remove_task_effects = False, runs = range(1, 7),space = 'fsaverage5', bids_folder='/mnt_03/ds-dnumrisk', task = 'magjudge', stim_duration = 3, TR = 2.3):
     # load in data as timeseries and regress out confounds (for each run sepeprately)
@@ -163,7 +163,7 @@ def fit_correlation_matrix_unfiltered(sub, bids_folder, ts_type='stimulus_1'):
 def get_basic_mask():
     atlas = datasets.fetch_atlas_surf_destrieux()
     regions = atlas['labels'].copy()
-    masked_regions = [b'Medial_wall', b'Unknown']
+    masked_regions = ['Medial_wall', 'Unknown']
     masked_labels = [regions.index(r) for r in masked_regions]
     for r in masked_regions:
         regions.remove(r)
@@ -172,7 +172,7 @@ def get_basic_mask():
     mask = ~np.isin(labeling, masked_labels)
     return mask, labeling_noParcel
 
-def get_glasser_parcels(base_folder='/mnt_03/diverse_neuralData/atlases_parcellations', space='fsaverage5'):
+def get_glasser_parcels(base_folder='/mnt_AdaBD_largefiles/Data/SMILE_Data/DNumRisk/atlases_parcellations', space='fsaverage5'):
     atlas_left = nib.load(op.join(base_folder,f'lh_space-{space}.HCPMMP1.gii')).agg_data()
     atlas_right =  nib.load(op.join(base_folder,f'rh_space-{space}.HCPMMP1.gii')).agg_data()
 
@@ -181,7 +181,7 @@ def get_glasser_parcels(base_folder='/mnt_03/diverse_neuralData/atlases_parcella
     # mask.sum() == len(labeling[(labeling != 1000) & (labeling != 2000)]) 
     return mask, labeling
 
-def get_glasser_CAatlas_mapping(datadir = '/mnt_03/diverse_neuralData/atlases_parcellations/ColeAnticevicNetPartition'):
+def get_glasser_CAatlas_mapping(datadir = '/mnt_AdaBD_largefiles/Data/SMILE_Data/DNumRisk/atlases_parcellations/ColeAnticevicNetPartition'):
     glasser_CAatlas_mapping = pd.read_csv(op.join(datadir,'cortex_parcel_network_assignments.txt'),header=None)
     glasser_CAatlas_mapping.index.name = 'glasser_parcel'
     glasser_CAatlas_mapping = glasser_CAatlas_mapping.rename({0:'ca_network'},axis=1)
