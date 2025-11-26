@@ -20,19 +20,19 @@ def main(sub,ses,bids_folder_cm, specification='', n_components=10):
         os.makedirs(target_dir)
 
     # Define the stimulus types
-    stimulus_types = ['1', '2']
+    stimulus_types = ['1', '2'] # '1', '2'
 
     for stim in stimulus_types:
         print(f'Processing stimulus: {stim}')       
 
         #CM unfiltered generated before?
-        cm_file = op.join(bids_folder_cm, 'derivatives', 'correlation_matrices.glmsingle', f'sub-{sub}_ses-{ses}_stimulus-{stim}_betas_space-fsav5.npy')
+        cm_file = op.join(bids_folder_cm, 'derivatives', 'correlation_matrices.glmsingle', f'sub-{sub}_ses-{ses}_stimulus-{stim}_betas_space-fsav5_transf.npy')
         if (os.path.exists(cm_file) == False):
             fit_correlation_matrix_unfiltered(sub,bids_folder = '/mnt_03/ds-dnumrisk')
         cm = np.load(cm_file)
 
         # filter out nodes that are not connected to the rest
-        cc_mask_file = op.join(target_dir,f'sub-{sub}_cc-mask_space-fsaverag5_betas.npy')
+        cc_mask_file = op.join(target_dir,f'sub-{sub}_cc-mask_space-fsaverag5_stim-{stim}_betas.npy')
         if (os.path.exists(cc_mask_file) == False):
             cc = connected_components(cm)
             mask_cc = cc[1] == 0 # all nodes in 0 belong to the largest connected component, check #-components in cc[0]
@@ -51,7 +51,7 @@ def main(sub,ses,bids_folder_cm, specification='', n_components=10):
 
         # now perform embedding on cleaned data + alignment
         print(f'start fitting gradintes now')
-        gm = GradientMaps(n_components=n_components,alignment='procrustes') # defaults: approacch = 'dm', kernel = None
+        gm = GradientMaps(n_components=n_components,alignment='procrustes', approach = 'dm', kernel = None) # defaults: approacch = 'dm', kernel = None
         gm.fit(cm_filtered,reference=g_ref_fil.T)
         print(f'finished sub-{sub}: gradients generated')
         
