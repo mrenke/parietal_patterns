@@ -83,7 +83,7 @@ def get_cleanTS(sub,  bids_folder,
 
     return cleanTS_all, usable_frames_all
     
-def main(sub, bids_folder,  sessions, tasks='magjudge-placevalue-rest'):
+def main(sub, bids_folder,  sessions, tasks):
 
     sub = f'{int(sub):02d}'
 
@@ -93,7 +93,7 @@ def main(sub, bids_folder,  sessions, tasks='magjudge-placevalue-rest'):
     cleanTS_all, usable_frames_all = get_cleanTS(sub,  bids_folder, 
             sessions = sessions, task_names =tasks)
     append_usableFrames_to_csv(sub, f'ses-{sessions}_task-{tasks}', usable_frames_all, 
-                  op.join(bids_folder, 'derivatives', 'correlation_matrices', 'usable_frames_per_subject.csv'))
+                  op.join(bids_folder, 'derivatives', 'correlation_matrices', f'usable_frames_per_subject_ses-{sessions}_tasks-{tasks}.csv'))
 
     mask, labeling_noParcel = get_basic_mask()
     seed_ts = cleanTS_all[mask]
@@ -107,7 +107,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('subject', default=None)
-    parser.add_argument('--bids_folder', default='/mnt_AdaBD_largefiles/Data/SMILE_DATA/DNumRisk/ds-smile')
+    parser.add_argument('--bids_folder', default='/mnt_AdaBD_largefiles/Data/DNumRisk_Data/ds-smile')
     parser.add_argument('--sessions', default='1')
     parser.add_argument('--tasks', default='magjudge')
 
