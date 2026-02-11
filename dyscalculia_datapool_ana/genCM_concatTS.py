@@ -1,7 +1,7 @@
 # Generate Correlation matrices for over sessions&tasks concatenated time series 
 
 # Problems: for numberline, not all subs have all sessions!
-#  
+
 import argparse
 from nilearn.connectome import ConnectivityMeasure
 import os.path as op

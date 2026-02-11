@@ -121,3 +121,33 @@ def get_gradients_tasks(subList,  bids_folder = '/mnt_AdaBD_largefiles/Data/DNum
 
     return df_gms
 
+def get_NPC_mask(bids_folder_orig = '/mnt_03/ds-dnumrisk', space = 'fsaverage5'):
+    surf_mask_L = op.join(bids_folder_orig, 'derivatives/surface_masks', f'desc-NPC_L_space-{space}_hemi-lh.label.gii')
+    surf_mask_L = nib.load(surf_mask_L).agg_data()
+    surf_mask_R = op.join(bids_folder_orig, 'derivatives/surface_masks', f'desc-NPC_R_space-{space}_hemi-rh.label.gii')
+    surf_mask_R = nib.load(surf_mask_R).agg_data()
+    nprf_r2 = np.concatenate((surf_mask_L, surf_mask_R))
+
+    nprf_r2 = np.bool_(nprf_r2)
+    return nprf_r2
+
+
+from scipy.stats import normaltest, ttest_ind, mannwhitneyu, ttest_rel
+
+def between_group_comparison(df_tmp, y_var, alpha=0.05, group_names = ['Control','Dyscalculic']):
+    pval_normal = normaltest(df_tmp[y_var]).pvalue
+    if 'group' not in df_tmp.columns:
+           df_tmp = df_tmp.reset_index('group')
+
+    group1 = df_tmp[df_tmp['group'] == group_names[0]][y_var].dropna()
+    group2 = df_tmp[df_tmp['group'] == group_names[1]][y_var].dropna()
+
+    if pval_normal > alpha:
+            stats = ttest_ind(group1, group2, axis=0)
+            stats_term = f't({len(group1)+len(group2)-2})'
+    else: # non parametric test
+            stats = mannwhitneyu(group1, group2, axis=0)
+            stats_term = f'U({len(group1)}, {len(group2)})'
+    return stats, stats_term
+
+

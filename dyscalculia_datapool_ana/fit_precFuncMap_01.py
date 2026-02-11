@@ -144,11 +144,12 @@ def main(sub,bids_folder = '/mnt_AdaBD_largefiles/Data/SMILE_Data/DNumRisk/ds-dn
     # Load in CM
     cm_fn = op.join(source_folder, f'sub-{sub}_ses-{sessions}_task-{tasks}_funcCM.npy')
     cm_f = np.load(cm_fn)
-
     cm_filtered = spatial_filtering(cm_f, bids_folder=bids_folder)
 
     if sub == 'All': # take normal cole anticevic atlas as reference
         ref_fn = op.join(bids_folder,'derivatives','networks_infomap', 'caNets_fsaverage5_mapping.npy') 
+    else: # take average task PFM as reference
+        ref_fn = op.join(bids_folder,'derivatives','networks_infomap', 'sub-All', f'sub-All_ses-{sessions}_task-{tasks}_threshs-{conn_thresholds_string}_precFuncMaps-consensMap.npy')
     target_labels_caNets = np.load(ref_fn)
 
     sub_module_mappings_relabelled = []
