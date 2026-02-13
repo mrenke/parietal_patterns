@@ -14,12 +14,15 @@ import pandas as pd
 from utils import get_basic_mask
 import time
 
-mask, labeling_noParcel = get_basic_mask()
 
 def main(subject, bids_folder, ses=1, task='magjudge', confspec='36P',
-        kernel = None, #'cosine',
+        kernel = None, 
         ztransf = False,
-        alignRef = '-tanH'):
+        alignRef = '-tanH',
+        cc_filtering = False):
+    
+    mask, labeling_noParcel = get_basic_mask()
+
     start_time = time.time()
     sub = f'{int(subject):02d}'
     key = f'.tryParams.{confspec}'
@@ -37,20 +40,19 @@ def main(subject, bids_folder, ses=1, task='magjudge', confspec='36P',
     cm = np.load(sub_file)
 
     if ztransf:
-        cm = np.arctanh(cm) # "....normalized the correlation coefficients using Fisher’s z-transformation -  
+        cm = np.arctanh(cm) # "....normalized the correlation coefficients using Fisher’s z-transformation -  # statistische Methode, die den Pearson-Korrelationskoeffizienten (\(r\)) in eine normalverteilte Variable (\(z^{\prime }\)) umwandel = its inverse hyperbolic tangent (artanh).
         cm[np.isinf(cm)] = 0
-    # statistische Methode, die den Pearson-Korrelationskoeffizienten (\(r\)) in eine normalverteilte Variable (\(z^{\prime }\)) umwandel = its inverse hyperbolic tangent (artanh).
+        cm[np.isnan(cm)] = 0
+        print('Applied Fisher z-transformation to connectivity matrix. & handled infs/nans.')
 
-    if kernel == None: # also needed for cosine I think
-        print('Applying CC-mask for kernel=None')
+    if kernel == None or cc_filtering : 
+        print('Applying CC-mask for kernel=None or cc_filtering=True')
         cc_mask_file = op.join(op.join(bids_folder, 'derivatives', f'gradients.{cm_confspec}', f'sub-{sub}'), f'sub-{sub}_cc-mask_space-fsaverag5.npy')
         mask_cc = np.load(cc_mask_file)
-        mask[mask == True] = mask_cc
-        cm = cm[mask_cc, :][:, mask_cc]
+        mask[mask == True] = mask_cc # update basic mask with cc mask so that also reference gradients is filtered correctly and the back-mapping works
+        cm = cm[mask_cc, :][:, mask_cc] #
 
     # reference gradients
-    #ref_grad = op.join(bids_folder, 'derivatives', f'gradients{key}', f'sub-All', f'sub-All_ses-{ses}_task-{task}_gradients_confspec-{confspec}_alignRef{alignRef}.npy')
-    #ref_grad = op.join(bids_folder, 'derivatives', f'gradients{key}',f'sub-All_ses-1_task-magjudge_gradients_kernel-None_ztransf-False_avMethod{alignRef}.npy')
     ref_grad = op.join(bids_folder, 'derivatives', f'gradients.tryParams.36P','sub-All', f'sub-All_gradients_{specification}_avMethod{alignRef}.npy')
     grad_ref = np.load(ref_grad)
     grad_ref_fil = grad_ref[:,mask].T  # only use nodes in mask
@@ -61,6 +63,7 @@ def main(subject, bids_folder, ses=1, task='magjudge', confspec='36P',
     gm.fit(cm, reference=grad_ref_fil)
 
     # save results
+    specification += '_ccfilter' if cc_filtering else ''
     np.save(op.join(target_dir,f'sub-{sub}_lambdas_{specification}.npy'), gm.lambdas_) 
 
     gm_= gm.gradients_.T 
@@ -87,8 +90,8 @@ if __name__ == "__main__":
     parser.add_argument('--kernel', type=str, help='Kernel type for GradientMaps') # if kernel none, CC-mask filtering is needed probably!
     parser.add_argument('--ztransf', action='store_true', help='Apply Fisher z-transformation to connectivity matrix')
     parser.add_argument('--alignRef', type=str, default='-tanH', help='Reference alignment method')
-
+    parser.add_argument('--cc_filtering', action='store_true', help='Apply CC-mask filtering')
     args = parser.parse_args()
 
     main(args.subject, args.bids_folder, 
-        kernel=args.kernel, ztransf=args.ztransf, alignRef=args.alignRef)
+        kernel=args.kernel, ztransf=args.ztransf, alignRef=args.alignRef, cc_filtering=args.cc_filtering)

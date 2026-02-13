@@ -25,6 +25,31 @@ stim_duration = 0.6
 # open questions: 
 # "....specifying that a given condition occurs more than one time over the course of the experiment, this information can and will be used for cross-validation purposes."
 # name "trial_type" rather "n1_number" and "n2_number" - so some events are the same?
+def get_fmri_events_bothStim_coOccCV(sub, session, runs, bids_folder):
+    behavior = []
+    for run in runs:
+        behavior.append(pd.read_table(op.join(
+            bids_folder, f'sub-{sub}/ses-{session}/func/sub-{sub}_ses-{session}_task-magjudge_run-{run}_events.tsv')))
+
+    behavior = pd.concat(behavior, keys=runs, names=['run'])
+    behavior = behavior.reset_index().set_index(
+        ['run', 'trial_type'])
+
+    behavior = behavior[behavior['trial_nr'] != 0]
+
+    stimulus1 = behavior.xs('stimulus 1', 0, 'trial_type', drop_level=False).reset_index('trial_type')[['onset', 'trial_nr', 'trial_type', 'n1']]
+    stimulus1['duration'] = stim_duration
+    stimulus1['trial_type'] = stimulus1.n1.map(lambda n1: f'n1_{int(n1)}')
+
+    stimulus2 = behavior.xs('stimulus 2', 0, 'trial_type', drop_level=False).reset_index('trial_type')[['onset', 'trial_nr', 'trial_type', 'n2']]
+    stimulus2['duration'] = stim_duration
+    stimulus2['trial_type'] = stimulus2.n2.map(lambda n2: f'n2_{int(n2)}')
+
+    events = pd.concat((stimulus1, stimulus2)).sort_index()
+    events = events[['onset', 'duration', 'trial_type']]  
+    
+    return events 
+
 
 def get_fmri_events_bothStim(sub, session, runs, bids_folder):
     behavior = []
@@ -73,12 +98,14 @@ def load_fmri_data(subject,bids_folder, space,session=1, task = 'magjudge', runs
 ##
 
 
-def main(subject,  bids_folder, space,  runs = range(1, 7), session = 1, task='magjudge'): #, smoothed=False,  retroicor=False, split_data = None): # 'both', 'run_123', 'run_456'
+def main(subject,  bids_folder, space,  runs = range(1, 7), session = 1, task='magjudge', coOccCV=False): #, smoothed=False,  retroicor=False, split_data = None): # 'both', 'run_123', 'run_456'
     
     derivatives = op.join(bids_folder, 'derivatives')
     subject = f'{int(subject):02d}'
 
     key = f'glm_stim.denoise'
+    key += '.coOccCV'  if coOccCV else ''
+
     base_dir = op.join(derivatives, key, f'sub-{subject}', f'ses-{session}', 'func')
     os.makedirs(base_dir, exist_ok=True)
 
@@ -86,7 +113,11 @@ def main(subject,  bids_folder, space,  runs = range(1, 7), session = 1, task='m
     im_data = load_fmri_data(subject, bids_folder=bids_folder, space=space) # _bold missing for numrisk
 
     # construct design matrix
-    onsets = get_fmri_events_bothStim(subject, session, runs, bids_folder)
+    if coOccCV:
+        onsets = get_fmri_events_bothStim_coOccCV(subject, session, runs, bids_folder)
+        print("Using co-occurring cross-validation design matrix for both stimuli.")
+    else:   
+        onsets = get_fmri_events_bothStim(subject, session, runs, bids_folder)
     tr = TR
     N_volumes = np.shape(im_data)[-1] # number of volumes
     frametimes = np.linspace(tr/2., (N_volumes - .5)*tr, N_volumes)
@@ -160,7 +191,8 @@ if __name__ == '__main__':
     parser.add_argument('subject', default=None)
     parser.add_argument('--bids_folder', default='/mnt_AdaBD_largefiles/Data/SMILE_DATA/DNumRisk/ds-numrisk')
     parser.add_argument('--space', default='fsaverage5') # 'T1w'
+    parser.add_argument('--coOccCV', action='store_true', help='Use co-occurring cross-validation design for both stimuli')
 
 
     args = parser.parse_args()
-    main(args.subject,bids_folder=args.bids_folder, space=args.space)
+    main(args.subject,bids_folder=args.bids_folder, space=args.space, coOccCV=args.coOccCV)
