@@ -163,7 +163,7 @@ def fit_correlation_matrix_unfiltered(sub, bids_folder, ts_type='stimulus_1'):
 def get_basic_mask():
     atlas = datasets.fetch_atlas_surf_destrieux()
     regions = atlas['labels'].copy()
-    masked_regions = ['Medial_wall', 'Unknown']
+    masked_regions = [b'Medial_wall', b'Unknown']
     masked_labels = [regions.index(r) for r in masked_regions]
     for r in masked_regions:
         regions.remove(r)
