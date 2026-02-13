@@ -12,6 +12,8 @@ import nibabel as nib
 import warnings
 warnings.filterwarnings('ignore')
 
+# GLMdenois does not work without noise voxels! -- space = fsaverage5 does not make sense!
+
 # run in terminal (weird numba error, which does not happen in VS-notebook):
 # rm -rf ~/.numba_cache
 # export NUMBA_DISABLE_JIT=1
@@ -107,7 +109,7 @@ def main(subject,  bids_folder, space,  runs = range(1, 7), session = 1, task='m
     key += '.coOccCV'  if coOccCV else ''
 
     base_dir = op.join(derivatives, key, f'sub-{subject}', f'ses-{session}', 'func')
-    os.makedirs(base_dir, exist_ok=True)
+    #os.makedirs(base_dir, exist_ok=True) # will be created by GLMsingle!
 
     # get fMRI data
     im_data = load_fmri_data(subject, bids_folder=bids_folder, space=space) # _bold missing for numrisk
