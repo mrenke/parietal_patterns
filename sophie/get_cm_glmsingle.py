@@ -32,6 +32,12 @@ def main(sub, bids_folder_input, bids_folder_output, stim):
     hemi_combined = [None] * 2
     for i, hemi in enumerate(['L', 'R']):
         filename = op.join(bids_folder_input, f'glm_stim{stim}.denoise', f'sub-{sub}', f'ses-{ses}', 'func', f'sub-{sub}_ses-1_task-magjudge_space-fsaverage5_stim-{stim}_hemi-{hemi}.func.gii') #{stim}     
+        
+        # Check if the file exists
+        if not os.path.exists(filename):
+            print(f"Beta file missing for sub-{sub}, hemi {hemi}. Skipping this subject.")
+            return  # exit the main function early
+        
         hemi_combined[i] = nib.load(filename).agg_data()
     print(f"Hemisphere {hemi} shape: {hemi_combined[i].shape}")
     hemi_combined = np.vstack(hemi_combined)
@@ -48,9 +54,16 @@ def main(sub, bids_folder_input, bids_folder_output, stim):
     
     # Compute the correlation matrix
     correlation_matrix = correlation_measure.fit_transform([seed_ts.T])[0]  # fit_transform returns a list of matrices
+
+    # Apply Fisher z-transform (arctanh) to normalize correlations
+    correlation_matrix_z = np.arctanh(correlation_matrix) # leave it in arctanh space
+
+    # Replace NaN and Inf values with 0
+    correlation_matrix_z[np.isnan(correlation_matrix_z)] = 0
+    correlation_matrix_z[np.isinf(correlation_matrix_z)] = 0
     
     # Save the computed correlation matrix
-    np.save(op.join(target_folder, f'sub-{sub}_ses-{ses}_stimulus-{stim}_betas_space-fsav5_transf.npy'), correlation_matrix)
+    np.save(op.join(target_folder, f'sub-{sub}_ses-{ses}_stimulus-{stim}_betas_space-fsav5.npy'), correlation_matrix_z)
     print(f'Raw connectivity matrix estimated and saved for sub {sub} and stim {stim}')
 
 
@@ -66,3 +79,4 @@ if __name__ == '__main__':
 
     main(cmd_args.subject, cmd_args.bids_folder_input, cmd_args.bids_folder_output, cmd_args.stim
           )
+    
