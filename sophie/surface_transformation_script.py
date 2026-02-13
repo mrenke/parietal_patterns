@@ -1,4 +1,5 @@
 import argparse
+import os
 import os.path as op
 from numrisk.utils.data import Subject
 from nilearn import surface
@@ -25,52 +26,55 @@ def transform_fsaverage(in_file, fs_hemi, source_subject, bids_folder, target_sp
         return r
 
 
-
-def main(subject_id, session,stim, bids_folder):
+def main(subject_id, session, stims, bids_folder):
     
     sub = Subject(subject_id, bids_folder=bids_folder)
     subject = f'{int(subject_id):02d}'
 
-    key = f'glm_stim{stim}.denoise' #
-    target_dir = op.join('/mnt_AdaBD_largefiles/Data/SMILE_Data/DNumRisk/ds-numrisk/', 'derivatives', key , f'sub-{subject}', f'ses-{session}', 'func')
+    stimsList = stims.split('-') if '-' in stims else [str(stims)]
 
-    surfinfo = sub.get_surf_info_fs()
+    for stim in stimsList:
 
-    print(f'Writing to {target_dir}')
+        key = f'glm_stim.denoise'
+        target_dir = op.join('/mnt_AdaBD_largefiles/Data/SMILE_Data/DNumRisk/ds-numrisk/', 'derivatives', key , f'sub-{subject}', f'ses-{session}', 'func')
+
+        surfinfo = sub.get_surf_info_fs()
+
+        print(f'Writing to {target_dir}')
 
 
-    fn = op.join(target_dir, f'sub-{subject}_ses-{session}_task-magjudge_space-T1w_desc-stims{stim}_pe.nii.gz')
-    betas_vol = nb.load(fn)
+        fn = op.join(target_dir, f'sub-{subject}_ses-{session}_task-magjudge_space-T1w_desc-stims{stim}_pe.nii.gz')
+        betas_vol = nb.load(fn)
 
-    mask = sub.get_brain_mask()
-    masker = NiftiMasker(mask_img=mask)
-    betas = masker.fit_transform(betas_vol)
-    betas_it= masker.inverse_transform(betas)
+        mask = sub.get_brain_mask()
+        masker = NiftiMasker(mask_img=mask)
+        betas = masker.fit_transform(betas_vol)
+        betas_it= masker.inverse_transform(betas)
 
-    for hemi in ['L', 'R']:
-        samples = surface.vol_to_surf(betas_it, surfinfo[hemi]['outer'], inner_mesh=surfinfo[hemi]['inner'])
-        fs_hemi = 'lh' if hemi == 'L' else 'rh'
+        for hemi in ['L', 'R']:
+            samples = surface.vol_to_surf(betas_it, surfinfo[hemi]['outer'], inner_mesh=surfinfo[hemi]['inner'])
+            fs_hemi = 'lh' if hemi == 'L' else 'rh'
 
-        darrays = [nb.gifti.GiftiDataArray(samples[:, ix].astype('float32')) for ix in range(samples.shape[1])]
-        im = nb.gifti.GiftiImage(darrays=darrays)
+            darrays = [nb.gifti.GiftiDataArray(samples[:, ix].astype('float32')) for ix in range(samples.shape[1])]
+            im = nb.gifti.GiftiImage(darrays=darrays)
 
-        for da in im.darrays:
-            da.intent = nb.nifti1.intent_codes['NIFTI_INTENT_TIME_SERIES']
+            for da in im.darrays:
+                da.intent = nb.nifti1.intent_codes['NIFTI_INTENT_TIME_SERIES']
 
-        target_fn = op.join(target_dir, f'sub-{subject}_ses-{session}_task-magjudge_space-fsnative_stim-{stim}_hemi-{hemi}.func.gii')
-        nb.save(im, target_fn)
+            target_fn = op.join(target_dir, f'sub-{subject}_ses-{session}_task-magjudge_space-fsnative_stim-{stim}_hemi-{hemi}.func.gii')
+            nb.save(im, target_fn)
 
-        transform_fsaverage(target_fn, fs_hemi, f'sub-{subject}', bids_folder, target_space = 'fsaverage5')
+            transform_fsaverage(target_fn, fs_hemi, f'sub-{subject}', bids_folder, target_space = 'fsaverage5')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('subject', default=None)
     parser.add_argument('--session', default=1)
-    parser.add_argument('--stim', default=1)
+    parser.add_argument('--stims', default='1-2')
     parser.add_argument('--bids_folder', default='/mnt_04/ds-numrisk')
 
     args = parser.parse_args()
 
-    main(args.subject, args.session, args.stim,bids_folder=args.bids_folder) # ,denoise=args.denoise
+    main(args.subject, args.session, args.stims,bids_folder=args.bids_folder) # ,denoise=args.denoise
 
     
