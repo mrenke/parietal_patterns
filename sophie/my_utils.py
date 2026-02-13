@@ -10,7 +10,7 @@ import pandas as pd
 from nipype.interfaces.freesurfer import SurfaceTransform # needs the fsaverage & fsaverage5 in ..derivatives/freesurfer folder!
 from nilearn import datasets
 
-# for plotting surface map
+# for plotting to the surface map
 from brainspace.utils.parcellation import map_to_labels
 from  nilearn.datasets import fetch_surf_fsaverage
 import nilearn.plotting as nplt

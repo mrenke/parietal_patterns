@@ -10,7 +10,7 @@ import os
 from nilearn import signal
 import pandas as pd
 from scipy.sparse.csgraph import connected_components
-from my_utils import get_basic_mask, fit_correlation_matrix_unfiltered #saveGradToNPFile, npFileTofs5Gii,fsav5Tofsnative
+from my_utils import get_basic_mask, fit_correlation_matrix_unfiltered
 
 def main(sub, ses, bids_folder_cm, bids_folder_ref, specification, kernel_name, n_components=10):
 

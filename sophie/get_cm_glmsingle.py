@@ -15,7 +15,7 @@ from nipype.interfaces.freesurfer import SurfaceTransform # needs the fsaverage 
 from nilearn import datasets
 from nilearn.connectome import ConnectivityMeasure
 
-# for plotting surface map
+# for plotting to the surface map
 from brainspace.utils.parcellation import map_to_labels, reduce_by_labels
 from  nilearn.datasets import fetch_surf_fsaverage
 import nilearn.plotting as nplt
