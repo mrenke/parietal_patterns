@@ -10,7 +10,7 @@ import pandas as pd
 from nipype.interfaces.freesurfer import SurfaceTransform # needs the fsaverage & fsaverage5 in ..derivatives/freesurfer folder!
 from nilearn import datasets
 
-# for plotting surface map
+# for plotting to the surface map
 from brainspace.utils.parcellation import map_to_labels
 from  nilearn.datasets import fetch_surf_fsaverage
 import nilearn.plotting as nplt
@@ -156,8 +156,13 @@ def fit_correlation_matrix_unfiltered(sub, bids_folder, ts_type='stimulus_1'):
     from nilearn.connectome import ConnectivityMeasure
     correlation_measure = ConnectivityMeasure(kind='correlation')
     cm = correlation_measure.fit_transform([seed_ts.T])[0] #correlation_matrix_noParcel
+    # Apply Fisher z-transform (arctanh) to normalize correlations
+    cm_z = np.arctanh(cm) # leave it in arctanh space
+    # Replace NaN and Inf values with 0
+    cm_z[np.isnan(cm_z)] = 0
+    cm_z[np.isinf(cm_z)] = 0
     print(f'sub-{sub}: raw connectivity matrix estimated')    
-    np.save(op.join(bids_folder, 'derivatives', 'correlation_matrices', f'sub-{sub}_unfiltered_{ts_type}.npy'), cm)
+    np.save(op.join(bids_folder, 'derivatives', 'correlation_matrices', f'sub-{sub}_unfiltered_{ts_type}.npy'), cm_z)
 
 
 def get_basic_mask():
