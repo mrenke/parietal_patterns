@@ -108,6 +108,7 @@ def grad_dispersion(bids_folder, kernel, sub, cm):
     grad = [None] * n_components
     diff = [None] * n_components
     sd = [None] * n_components
+
     for i, g in enumerate(gm_): # gm.gradients_.T
         grad[i] = map_to_labels(g, labeling_noParcel, mask=mask, fill=np.nan)
         diff[i] = np.nanmax(grad[i]) - np.nanmin(grad[i])
@@ -151,7 +152,10 @@ def main(sub, bids_folder_input, bids_folder_output, kernel, steps, grad_nr, con
     confspec += f'-{N_valid_runs}runs' if run_FD_filter else confspec
 
     dic = {'usable_frames': [], 
-           'diff': []}
+           'diff_grad': [],
+           'sd_grad':[],
+           'diff_cm': [],
+           'sd_cm': []}
 
     # Step 2: iteratively truncate concatenated time series
     n_frames_list = list(range(total_frames, 0, -steps))
@@ -163,49 +167,88 @@ def main(sub, bids_folder_input, bids_folder_output, kernel, steps, grad_nr, con
 
         correlation_measure = ConnectivityMeasure(kind='correlation')
         c_m = correlation_measure.fit_transform([seed_ts.T])[0] #correlation_matrix_noParcel
+        np.fill_diagonal(c_m, np.nan)
+
+        diff_cm = np.nanmax(c_m) - np.nanmin(c_m)
+        sd_cm = np.nanstd(c_m)
+
         print(f'sub-{sub} ses-{ses} task-{task} conf-{confspec}: raw connectivity matrix estimated')    
 
-        try:
-            grad, diff, sd = grad_dispersion(bids_folder_output, kernel, sub, cm=c_m)
+        grad, diff, sd = grad_dispersion(bids_folder_output, kernel, sub, cm=c_m)
 
 
-            dic['usable_frames'].append(n_frames)
-            dic['diff'].append(diff[grad_nr-1])
-
-            print(f'done with deducting {n_frames} frames')
-        except ValueError as e:
-            print(f"Skipping, {truncated_ts.shape[1]} frames remaining: gradient fit failed -> {e}")
-            continue
+        dic['usable_frames'].append(n_frames)
+        dic['diff_grad'].append(diff[grad_nr-1])
+        dic['sd_grad'].append(sd[grad_nr-1])
+        dic['diff_cm'].append(diff_cm)
+        dic['sd_cm'].append(sd_cm)
 
     df = pd.DataFrame(dic)
 
     x = df['usable_frames']
-    y = df['diff']
-    x_name = 'usable_frames'
-    y_name = 'diff'
+    y_list = [df['diff_cm'], df['sd_cm']]
+    x_name = 'Number of Usable Frames'
+    y_name = ['Whole range correlation matrix ', 'SD correlation matrix']
+    save_name = ['diff', 'sd']
 
-    slope, intercept, r_value, p_value, std_err = linregress(x, y)
+    for ind, y in enumerate(y_list):
 
-    r, p = pearsonr(x, y)
-    print(r, p)
+        # corr matrix range
+        slope, intercept, r_value, p_value, std_err = linregress(x, y)
 
-    # Scatter plot
-    plt.figure(figsize=(6, 5))
-    plt.scatter(x, y, color='blue', alpha=0.7, label='Subjects per task')
+        r, p = pearsonr(x, y)
+        print(r, p)
 
-    # Fit and plot a regression line
-    slope, intercept, r_value, p_value, std_err = linregress(x, y)
-    plt.plot(x, slope*x + intercept, color='red', label=f'Fit line: r={r_value:.2f}')
+        # Scatter plot correlation matrix
+        plt.figure(figsize=(6, 5))
+        plt.scatter(x, y, color='blue', alpha=0.7, label='Iteration')
 
-    # Labels and title
-    plt.xlabel(f'{x_name}')
-    plt.ylabel(f'{y_name}')
-    plt.title(f"Scatter plot of {x_name} vs. {y_name}, p={p_value}")
-    plt.legend()
-    plt.tight_layout()
-    plot_dir = op.join(bids_folder_output, 'plots_and_ims')
-    os.makedirs(plot_dir, exist_ok=True)
-    plt.savefig(op.join(plot_dir, f'sub-{sub}_grad_vs_frames.png'), dpi=300)
+        # Fit and plot a regression line
+        slope, intercept, r_value, p_value, std_err = linregress(x, y)
+        plt.plot(x, slope*x + intercept, color='red', label=f'Fit line: r={r_value:.2f}')
+
+        # Labels and title
+        plt.xlabel(f'{x_name}')
+        plt.ylabel(f'{y_name[ind]}')
+        plt.title(f"Scatter plot of subject {sub}, {x_name} vs. {y_name[ind]}, p={p_value:.5f}")
+        plt.legend()
+        plt.tight_layout()
+        plot_dir = op.join(bids_folder_output, 'plots_and_ims')
+        os.makedirs(plot_dir, exist_ok=True)
+        plt.savefig(op.join(plot_dir, f'sub-{sub}_cm-{save_name[ind]}_vs_frames.png'), dpi=300)
+
+
+    x = df['usable_frames']
+    y_list = [df['diff_grad'], df['sd_grad']]
+    x_name = 'Number of Usable Frames'
+    y_name = ['Whole range gradient', 'SD gradient']
+    save_name = ['diff', 'sd']
+
+    for ind, y in enumerate(y_list):
+
+        # corr matrix range
+        slope, intercept, r_value, p_value, std_err = linregress(x, y)
+
+        r, p = pearsonr(x, y)
+        print(r, p)
+
+        # Scatter plot correlation matrix
+        plt.figure(figsize=(6, 5))
+        plt.scatter(x, y, color='blue', alpha=0.7, label='Iteration')
+
+        # Fit and plot a regression line
+        slope, intercept, r_value, p_value, std_err = linregress(x, y)
+        plt.plot(x, slope*x + intercept, color='red', label=f'Fit line: r={r_value:.2f}')
+
+        # Labels and title
+        plt.xlabel(f'{x_name}')
+        plt.ylabel(f'{y_name[ind]}')
+        plt.title(f"Scatter plot of subject {sub}, {x_name} vs. {y_name[ind]}, p={p_value:.5f}")
+        plt.legend()
+        plt.tight_layout()
+        plot_dir = op.join(bids_folder_output, 'plots_and_ims')
+        os.makedirs(plot_dir, exist_ok=True)
+        plt.savefig(op.join(plot_dir, f'sub-{sub}_grad-{save_name[ind]}_vs_frames.png'), dpi=300)
 
 if __name__ == '__main__':
 
@@ -213,7 +256,7 @@ if __name__ == '__main__':
     parser.add_argument('subject', default='60') # based on least framewise displacement
     parser.add_argument('--bids_folder_input', default='/mnt_03/ds-dnumrisk')
     parser.add_argument('--bids_folder_output', default='/mnt_AdaBD_largefiles/Data/SMILE_DATA/DNumRisk/ds-dnumrisk')    
-    parser.add_argument('--steps', default=100, type=int)
+    parser.add_argument('--steps', default=50, type=int)
     parser.add_argument('--grad_nr', default=1, type=int)
     parser.add_argument('--confspec', default='36P') # instead of 32P
     parser.add_argument('--task', default='magjudge')
