@@ -12,6 +12,7 @@ from nilearn.connectome import ConnectivityMeasure
 from brainspace.gradient import GradientMaps
 from brainspace.utils.parcellation import map_to_labels
 from scipy.sparse.csgraph import connected_components
+from kneed import KneeLocator
 from scipy.stats import linregress
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -138,8 +139,6 @@ def main(sub, bids_folder_input, bids_folder_output, kernel, steps, grad_nr, con
         fmriprep_confounds_include.append(param + '_derivative1_power2')
 
 
-
-
     clean_ts, N_valid_runs, total_frames = cleanTS(sub,fmriprep_confounds_include=fmriprep_confounds_include, bids_folder=bids_folder_input, task=task, ses=ses, 
                 scrubbing=scrubbing,  scrub_thresh=scrub_thresh,
                 run_FD_filter=run_FD_filter, frames_per_run_thresh=frames_per_run_thresh,
@@ -167,14 +166,14 @@ def main(sub, bids_folder_input, bids_folder_output, kernel, steps, grad_nr, con
 
         correlation_measure = ConnectivityMeasure(kind='correlation')
         c_m = correlation_measure.fit_transform([seed_ts.T])[0] #correlation_matrix_noParcel
-        np.fill_diagonal(c_m, np.nan)
 
+        grad, diff, sd = grad_dispersion(bids_folder_output, kernel, sub, cm=c_m)
+
+        np.fill_diagonal(c_m, np.nan)
         diff_cm = np.nanmax(c_m) - np.nanmin(c_m)
         sd_cm = np.nanstd(c_m)
 
-        print(f'sub-{sub} ses-{ses} task-{task} conf-{confspec}: raw connectivity matrix estimated')    
-
-        grad, diff, sd = grad_dispersion(bids_folder_output, kernel, sub, cm=c_m)
+        print(f'sub-{sub}: raw connectivity matrix estimated, {n_frames} left')    
 
 
         dic['usable_frames'].append(n_frames)
@@ -184,6 +183,12 @@ def main(sub, bids_folder_input, bids_folder_output, kernel, steps, grad_nr, con
         dic['sd_cm'].append(sd_cm)
 
     df = pd.DataFrame(dic)
+    df = df.sort_values("usable_frames").reset_index(drop=True)
+
+    # Save the dataframe
+    df_file = op.join(bids_folder_output, 'plots_and_ims', f'sub-{sub}_framewise_metrics.csv')
+    df.to_csv(df_file, index=False)
+    print(f"Saved metrics dataframe to {df_file}")
 
     x = df['usable_frames']
     y_list = [df['diff_cm'], df['sd_cm']]
@@ -192,6 +197,11 @@ def main(sub, bids_folder_input, bids_folder_output, kernel, steps, grad_nr, con
     save_name = ['diff', 'sd']
 
     for ind, y in enumerate(y_list):
+
+        # add knee plot
+        kneedle = KneeLocator(x, y, curve='convex', direction='decreasing')
+        knee_x = kneedle.knee
+        knee_y = kneedle.knee_y
 
         # corr matrix range
         slope, intercept, r_value, p_value, std_err = linregress(x, y)
@@ -205,7 +215,10 @@ def main(sub, bids_folder_input, bids_folder_output, kernel, steps, grad_nr, con
 
         # Fit and plot a regression line
         slope, intercept, r_value, p_value, std_err = linregress(x, y)
-        plt.plot(x, slope*x + intercept, color='red', label=f'Fit line: r={r_value:.2f}')
+        plt.plot(x, slope*x + intercept, color='red', label=f'Fit line: r={r_value:.2f}\np={p_value:.5f}')
+
+        if knee_x is not None:
+            plt.scatter(knee_x, knee_y, color='green', s=80, marker='X', label='Knee point')
 
         # Labels and title
         plt.xlabel(f'{x_name}')
@@ -215,7 +228,8 @@ def main(sub, bids_folder_input, bids_folder_output, kernel, steps, grad_nr, con
         plt.tight_layout()
         plot_dir = op.join(bids_folder_output, 'plots_and_ims')
         os.makedirs(plot_dir, exist_ok=True)
-        plt.savefig(op.join(plot_dir, f'sub-{sub}_cm-{save_name[ind]}_vs_frames.png'), dpi=300)
+        plt.savefig(op.join(plot_dir, f'sub-{sub}_cm-{save_name[ind]}_vs_frames.png'), dpi=300, bbox_inches='tight')
+        plt.close()
 
 
     x = df['usable_frames']
@@ -226,6 +240,11 @@ def main(sub, bids_folder_input, bids_folder_output, kernel, steps, grad_nr, con
 
     for ind, y in enumerate(y_list):
 
+        # add knee plot
+        kneedle = KneeLocator(x, y, curve='concave', direction='increasing')
+        knee_x = kneedle.knee
+        knee_y = kneedle.knee_y
+
         # corr matrix range
         slope, intercept, r_value, p_value, std_err = linregress(x, y)
 
@@ -238,7 +257,10 @@ def main(sub, bids_folder_input, bids_folder_output, kernel, steps, grad_nr, con
 
         # Fit and plot a regression line
         slope, intercept, r_value, p_value, std_err = linregress(x, y)
-        plt.plot(x, slope*x + intercept, color='red', label=f'Fit line: r={r_value:.2f}')
+        plt.plot(x, slope*x + intercept, color='red', label=f'Fit line: r={r_value:.2f}\np={p_value:.5f}')
+
+        if knee_x is not None:
+            plt.scatter(knee_x, knee_y, color='green', s=80, marker='X', label='Knee point')
 
         # Labels and title
         plt.xlabel(f'{x_name}')
@@ -248,7 +270,8 @@ def main(sub, bids_folder_input, bids_folder_output, kernel, steps, grad_nr, con
         plt.tight_layout()
         plot_dir = op.join(bids_folder_output, 'plots_and_ims')
         os.makedirs(plot_dir, exist_ok=True)
-        plt.savefig(op.join(plot_dir, f'sub-{sub}_grad-{save_name[ind]}_vs_frames.png'), dpi=300)
+        plt.savefig(op.join(plot_dir, f'sub-{sub}_grad-{save_name[ind]}_vs_frames.png'), dpi=300, bbox_inches='tight')
+        plt.close()
 
 if __name__ == '__main__':
 
