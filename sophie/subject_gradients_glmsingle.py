@@ -37,8 +37,15 @@ def main(sub, ses, bids_folder_cm, bids_folder_ref, specification, kernel_name, 
             print(f"Correlation matrix missing for sub-{sub}, stim {stim}. Skipping.")
             continue
 
-        cm = np.load(cm_file)
+        cm_notz = np.load(cm_file)
 
+        # Apply Fisher z-transform (arctanh) to normalize correlations
+        cm = np.arctanh(cm_notz) # leave it in arctanh space
+
+        # Replace NaN and Inf values with 0
+        cm[np.isnan(cm)] = 0
+        cm[np.isinf(cm)] = 0
+    
         # filter out nodes that are not connected to the rest
         cc_mask_file = op.join(target_dir,f'sub-{sub}_cc-mask_space-fsaverag5_stim-{stim}_betas_kernel-{kernel_name}.npy')
         if (os.path.exists(cc_mask_file) == False):
