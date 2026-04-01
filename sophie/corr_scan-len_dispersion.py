@@ -12,6 +12,7 @@ from nilearn.connectome import ConnectivityMeasure
 from brainspace.gradient import GradientMaps
 from brainspace.utils.parcellation import map_to_labels
 from scipy.sparse.csgraph import connected_components
+from kneed import KneeLocator
 from scipy.stats import linregress
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -108,6 +109,7 @@ def grad_dispersion(bids_folder, kernel, sub, cm):
     grad = [None] * n_components
     diff = [None] * n_components
     sd = [None] * n_components
+
     for i, g in enumerate(gm_): # gm.gradients_.T
         grad[i] = map_to_labels(g, labeling_noParcel, mask=mask, fill=np.nan)
         diff[i] = np.nanmax(grad[i]) - np.nanmin(grad[i])
@@ -137,8 +139,6 @@ def main(sub, bids_folder_input, bids_folder_output, kernel, steps, grad_nr, con
         fmriprep_confounds_include.append(param + '_derivative1_power2')
 
 
-
-
     clean_ts, N_valid_runs, total_frames = cleanTS(sub,fmriprep_confounds_include=fmriprep_confounds_include, bids_folder=bids_folder_input, task=task, ses=ses, 
                 scrubbing=scrubbing,  scrub_thresh=scrub_thresh,
                 run_FD_filter=run_FD_filter, frames_per_run_thresh=frames_per_run_thresh,
@@ -151,7 +151,10 @@ def main(sub, bids_folder_input, bids_folder_output, kernel, steps, grad_nr, con
     confspec += f'-{N_valid_runs}runs' if run_FD_filter else confspec
 
     dic = {'usable_frames': [], 
-           'diff': []}
+           'diff_grad': [],
+           'sd_grad':[],
+           'diff_cm': [],
+           'sd_cm': []}
 
     # Step 2: iteratively truncate concatenated time series
     n_frames_list = list(range(total_frames, 0, -steps))
@@ -163,50 +166,112 @@ def main(sub, bids_folder_input, bids_folder_output, kernel, steps, grad_nr, con
 
         correlation_measure = ConnectivityMeasure(kind='correlation')
         c_m = correlation_measure.fit_transform([seed_ts.T])[0] #correlation_matrix_noParcel
-        print(f'sub-{sub} ses-{ses} task-{task} conf-{confspec}: raw connectivity matrix estimated')    
 
-        try:
-            grad, diff, sd = grad_dispersion(bids_folder_output, kernel, sub, cm=c_m)
+        grad, diff, sd = grad_dispersion(bids_folder_output, kernel, sub, cm=c_m)
+
+        np.fill_diagonal(c_m, np.nan)
+        diff_cm = np.nanmax(c_m) - np.nanmin(c_m)
+        sd_cm = np.nanstd(c_m)
+
+        print(f'sub-{sub}: raw connectivity matrix estimated, {n_frames} left')    
 
 
-            dic['usable_frames'].append(n_frames)
-            dic['diff'].append(diff[grad_nr-1])
-
-            print(f'done with deducting {n_frames} frames')
-        except ValueError as e:
-            print(f"Skipping, {truncated_ts.shape[1]} frames remaining: gradient fit failed -> {e}")
-            continue
+        dic['usable_frames'].append(n_frames)
+        dic['diff_grad'].append(diff[grad_nr-1])
+        dic['sd_grad'].append(sd[grad_nr-1])
+        dic['diff_cm'].append(diff_cm)
+        dic['sd_cm'].append(sd_cm)
 
     df = pd.DataFrame(dic)
-    df.to_csv(op.join(bids_folder_output, 'derivatives', 'corr_usable-frames_grad-range_cm-sd', f'sub-{sub}.csv'))
+    df = df.sort_values("usable_frames").reset_index(drop=True)
 
-    # x = df['usable_frames']
-    # y = df['diff']
-    # x_name = 'usable_frames'
-    # y_name = 'diff'
+    # Save the dataframe
+    df_file = op.join(bids_folder_output, 'plots_and_ims', f'sub-{sub}_framewise_metrics.csv')
+    df.to_csv(df_file, index=False)
+    print(f"Saved metrics dataframe to {df_file}")
 
-    # slope, intercept, r_value, p_value, std_err = linregress(x, y)
+    x = df['usable_frames']
+    y_list = [df['diff_cm'], df['sd_cm']]
+    x_name = 'Number of Usable Frames'
+    y_name = ['Whole range correlation matrix ', 'SD correlation matrix']
+    save_name = ['diff', 'sd']
 
-    # r, p = pearsonr(x, y)
-    # print(r, p)
+    for ind, y in enumerate(y_list):
 
-    # # Scatter plot
-    # plt.figure(figsize=(6, 5))
-    # plt.scatter(x, y, color='blue', alpha=0.7, label='Subjects per task')
+        # add knee plot
+        kneedle = KneeLocator(x, y, curve='convex', direction='decreasing')
+        knee_x = kneedle.knee
+        knee_y = kneedle.knee_y
 
-    # # Fit and plot a regression line
-    # slope, intercept, r_value, p_value, std_err = linregress(x, y)
-    # plt.plot(x, slope*x + intercept, color='red', label=f'Fit line: r={r_value:.2f}')
+        # corr matrix range
+        slope, intercept, r_value, p_value, std_err = linregress(x, y)
 
-    # # Labels and title
-    # plt.xlabel(f'{x_name}')
-    # plt.ylabel(f'{y_name}')
-    # plt.title(f"Scatter plot of {x_name} vs. {y_name}, p={p_value}")
-    # plt.legend()
-    # plt.tight_layout()
-    # plot_dir = op.join(bids_folder_output, 'plots_and_ims')
-    # os.makedirs(plot_dir, exist_ok=True)
-    # plt.savefig(op.join(plot_dir, f'sub-{sub}_grad_vs_frames.png'), dpi=300)
+        r, p = pearsonr(x, y)
+        print(r, p)
+
+        # Scatter plot correlation matrix
+        plt.figure(figsize=(6, 5))
+        plt.scatter(x, y, color='blue', alpha=0.7, label='Iteration')
+
+        # Fit and plot a regression line
+        slope, intercept, r_value, p_value, std_err = linregress(x, y)
+        plt.plot(x, slope*x + intercept, color='red', label=f'Fit line: r={r_value:.2f}\np={p_value:.5f}')
+
+        if knee_x is not None:
+            plt.scatter(knee_x, knee_y, color='green', s=80, marker='X', label='Knee point')
+
+        # Labels and title
+        plt.xlabel(f'{x_name}')
+        plt.ylabel(f'{y_name[ind]}')
+        plt.title(f"Scatter plot of subject {sub}, {x_name} vs. {y_name[ind]}, p={p_value:.5f}")
+        plt.legend()
+        plt.tight_layout()
+        plot_dir = op.join(bids_folder_output, 'plots_and_ims')
+        os.makedirs(plot_dir, exist_ok=True)
+        plt.savefig(op.join(plot_dir, f'sub-{sub}_cm-{save_name[ind]}_vs_frames.png'), dpi=300, bbox_inches='tight')
+        plt.close()
+
+
+    x = df['usable_frames']
+    y_list = [df['diff_grad'], df['sd_grad']]
+    x_name = 'Number of Usable Frames'
+    y_name = ['Whole range gradient', 'SD gradient']
+    save_name = ['diff', 'sd']
+
+    for ind, y in enumerate(y_list):
+
+        # add knee plot
+        kneedle = KneeLocator(x, y, curve='concave', direction='increasing')
+        knee_x = kneedle.knee
+        knee_y = kneedle.knee_y
+
+        # corr matrix range
+        slope, intercept, r_value, p_value, std_err = linregress(x, y)
+
+        r, p = pearsonr(x, y)
+        print(r, p)
+
+        # Scatter plot correlation matrix
+        plt.figure(figsize=(6, 5))
+        plt.scatter(x, y, color='blue', alpha=0.7, label='Iteration')
+
+        # Fit and plot a regression line
+        slope, intercept, r_value, p_value, std_err = linregress(x, y)
+        plt.plot(x, slope*x + intercept, color='red', label=f'Fit line: r={r_value:.2f}\np={p_value:.5f}')
+
+        if knee_x is not None:
+            plt.scatter(knee_x, knee_y, color='green', s=80, marker='X', label='Knee point')
+
+        # Labels and title
+        plt.xlabel(f'{x_name}')
+        plt.ylabel(f'{y_name[ind]}')
+        plt.title(f"Scatter plot of subject {sub}, {x_name} vs. {y_name[ind]}, p={p_value:.5f}")
+        plt.legend()
+        plt.tight_layout()
+        plot_dir = op.join(bids_folder_output, 'plots_and_ims')
+        os.makedirs(plot_dir, exist_ok=True)
+        plt.savefig(op.join(plot_dir, f'sub-{sub}_grad-{save_name[ind]}_vs_frames.png'), dpi=300, bbox_inches='tight')
+        plt.close()
 
 if __name__ == '__main__':
 
