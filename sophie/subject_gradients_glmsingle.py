@@ -91,7 +91,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('subject', default=None)
     parser.add_argument('--session', default=1, type=int)  
-    parser.add_argument('--bids_folder_cm', default='/mnt_AdaBD_largefiles/Data/SMILE_DATA/DNumRisk/ds-dnumrisk')
+    parser.add_argument('--bids_folder_cm', default='/mnt_AdaBD_largefiles/Data/SMILE_DATA/DNumRisk/ds-numrisk')
     parser.add_argument('--bids_folder_ref', default='/mnt_AdaBD_largefiles/Data/DNumrisk_Data/connectivity_references') # /mnt_AdaBD_largefiles/Data/SMILE_DATA/DNumRisk/ds-dnumrisk
     parser.add_argument('--specification', default='')
     parser.add_argument('--kernel_name', default='normalized_angle')

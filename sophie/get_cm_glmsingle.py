@@ -52,9 +52,13 @@ def main(sub, bids_folder_input, bids_folder_output): #, stim
 
         # Build Destrieux parcellation and mask
         mask, labeling_noParcel = get_basic_mask()
+        # Build Destrieux parcellation and mask
+        mask, labeling_noParcel = get_basic_mask()
 
         print(f'size of mask: {mask.shape}')
+        print(f'size of mask: {mask.shape}')
 
+        print(f'Beta time series loaded for sub-{sub}')
         print(f'Beta time series loaded for sub-{sub}')
 
         seed_ts = hemi_combined[mask]
