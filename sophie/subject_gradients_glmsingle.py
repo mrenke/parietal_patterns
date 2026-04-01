@@ -26,6 +26,7 @@ def main(sub, ses, bids_folder_cm, bids_folder_ref, specification, kernel_name, 
 
     # Define the stimulus types
     stimulus_types = ['1', '2'] # '1', '2'
+    specif = '_ztransf-true'
 
     for stim in stimulus_types:
         print(f'Processing stimulus: {stim}')       
@@ -47,7 +48,7 @@ def main(sub, ses, bids_folder_cm, bids_folder_ref, specification, kernel_name, 
         cm[np.isinf(cm)] = 0
     
         # filter out nodes that are not connected to the rest
-        cc_mask_file = op.join(target_dir,f'sub-{sub}_cc-mask_space-fsaverag5_stim-{stim}_betas_kernel-{kernel_name}.npy')
+        cc_mask_file = op.join(target_dir,f'sub-{sub}_cc-mask_space-fsaverag5_stim-{stim}_betas_kernel-{kernel_name}{specif}.npy')
         if (os.path.exists(cc_mask_file) == False):
             cc = connected_components(cm)
             mask_cc = cc[1] == 0 # all nodes in 0 belong to the largest connected component, check #-components in cc[0]
@@ -72,17 +73,17 @@ def main(sub, ses, bids_folder_cm, bids_folder_ref, specification, kernel_name, 
         print(f'finished sub-{sub}: gradients generated')
         
         # save results
-        np.save(op.join(target_dir,f'sub-{sub}_lambdas_space-fsaverag5_n10{specification}_stimulus-{stim}_betas_kernel-{kernel_name}_av-aligned.npy'), gm.lambdas_) # save all together
+        np.save(op.join(target_dir,f'sub-{sub}_lambdas_space-fsaverag5_n10{specification}_stimulus-{stim}_betas_kernel-{kernel_name}{specif}.npy'), gm.lambdas_) # save all together
         gm_= gm.gradients_.T 
         grad = [None] * n_components
         for i, g in enumerate(gm_): # gm.gradients_.T
             grad[i] = map_to_labels(g, labeling_noParcel, mask=mask, fill=np.nan)
-        np.save(op.join(target_dir,f'sub-{sub}_gradients_space-fsaverag5_n10{specification}_stimulus-{stim}_betas_kernel-{kernel_name}_av-aligned.npy'), grad) # save all together
+        np.save(op.join(target_dir,f'sub-{sub}_gradients_space-fsaverag5_n10{specification}_stimulus-{stim}_betas_kernel-{kernel_name}{specif}.npy'), grad) # save all together
         gm_ = gm.aligned_.T
         grad = [None] * n_components
         for i, g in enumerate(gm_): # gm.gradients_.T
             grad[i] = map_to_labels(g, labeling_noParcel, mask=mask, fill=np.nan)
-        np.save(op.join(target_dir,f'sub-{sub}_g-aligned_space-fsaverag5_n10{specification}_stimulus-{stim}_betas_kernel-{kernel_name}_av-aligned.npy'), grad) # save all together    
+        np.save(op.join(target_dir,f'sub-{sub}_g-aligned_space-fsaverag5_n10{specification}_stimulus-{stim}_betas_kernel-{kernel_name}{specif}.npy'), grad) # save all together    
 
 
 if __name__ == '__main__':
