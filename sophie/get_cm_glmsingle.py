@@ -31,7 +31,7 @@ def main(sub, bids_folder_input, bids_folder_output, stim):
 
     hemi_combined = [None] * 2
     for i, hemi in enumerate(['L', 'R']):
-        filename = op.join(bids_folder_input, f'glm_stim{stim}.denoise', f'sub-{sub}', f'ses-{ses}', 'func', f'sub-{sub}_ses-1_task-magjudge_space-fsaverage5_stim-{stim}_hemi-{hemi}.func.gii') #{stim}     
+        filename = op.join(bids_folder_input, f'glm_stim.denoise', f'sub-{sub}', f'ses-{ses}', 'func', f'sub-{sub}_ses-1_task-magjudge_space-fsaverage5_stim-{stim}_hemi-{hemi}.func.gii') #{stim}     
         
         # Check if the file exists
         if not os.path.exists(filename):

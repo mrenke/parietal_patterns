@@ -9,6 +9,7 @@ from nilearn import signal
 import pandas as pd
 from nipype.interfaces.freesurfer import SurfaceTransform # needs the fsaverage & fsaverage5 in ..derivatives/freesurfer folder!
 from nilearn import datasets
+import matplotlib.colors as colors
 
 # for plotting to the surface map
 from brainspace.utils.parcellation import map_to_labels
@@ -168,7 +169,7 @@ def fit_correlation_matrix_unfiltered(sub, bids_folder, ts_type='stimulus_1'):
 def get_basic_mask():
     atlas = datasets.fetch_atlas_surf_destrieux()
     regions = atlas['labels'].copy()
-    masked_regions = [b'Medial_wall', b'Unknown']
+    masked_regions = ['Medial_wall', 'Unknown']
     masked_labels = [regions.index(r) for r in masked_regions]
     for r in masked_regions:
         regions.remove(r)
@@ -195,3 +196,16 @@ def get_glasser_CAatlas_mapping(datadir = '/mnt_AdaBD_largefiles/Data/SMILE_Data
     CAatlas_names = CAatlas_names.set_index('Label Number')
     CAatlas_names = CAatlas_names.sort_index(level='Label Number')
     return glasser_CAatlas_mapping, CAatlas_names
+
+def get_GMmargulies_cmap(skewed=True): 
+    # proportion of the two colormaps, defines how much space is taken by each
+    first = int((128*2)-np.round(255*(1.-0.90)))
+    second = (256-first)
+    first = first if skewed else second
+    colors2 = plt.cm.viridis(np.linspace(0.1, .98, first))
+    colors3 = plt.cm.YlOrBr(np.linspace(0.25, 1, second))
+
+    # combine them and build a new colormap
+    cols = np.vstack((colors2,colors3))
+    mymap = colors.LinearSegmentedColormap.from_list('my_colormap', cols)
+    return mymap

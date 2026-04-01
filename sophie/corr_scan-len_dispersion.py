@@ -178,34 +178,35 @@ def main(sub, bids_folder_input, bids_folder_output, kernel, steps, grad_nr, con
             continue
 
     df = pd.DataFrame(dic)
+    df.to_csv(op.join(bids_folder_output, 'derivatives', 'corr_usable-frames_grad-range_cm-sd', f'sub-{sub}.csv'))
 
-    x = df['usable_frames']
-    y = df['diff']
-    x_name = 'usable_frames'
-    y_name = 'diff'
+    # x = df['usable_frames']
+    # y = df['diff']
+    # x_name = 'usable_frames'
+    # y_name = 'diff'
 
-    slope, intercept, r_value, p_value, std_err = linregress(x, y)
+    # slope, intercept, r_value, p_value, std_err = linregress(x, y)
 
-    r, p = pearsonr(x, y)
-    print(r, p)
+    # r, p = pearsonr(x, y)
+    # print(r, p)
 
-    # Scatter plot
-    plt.figure(figsize=(6, 5))
-    plt.scatter(x, y, color='blue', alpha=0.7, label='Subjects per task')
+    # # Scatter plot
+    # plt.figure(figsize=(6, 5))
+    # plt.scatter(x, y, color='blue', alpha=0.7, label='Subjects per task')
 
-    # Fit and plot a regression line
-    slope, intercept, r_value, p_value, std_err = linregress(x, y)
-    plt.plot(x, slope*x + intercept, color='red', label=f'Fit line: r={r_value:.2f}')
+    # # Fit and plot a regression line
+    # slope, intercept, r_value, p_value, std_err = linregress(x, y)
+    # plt.plot(x, slope*x + intercept, color='red', label=f'Fit line: r={r_value:.2f}')
 
-    # Labels and title
-    plt.xlabel(f'{x_name}')
-    plt.ylabel(f'{y_name}')
-    plt.title(f"Scatter plot of {x_name} vs. {y_name}, p={p_value}")
-    plt.legend()
-    plt.tight_layout()
-    plot_dir = op.join(bids_folder_output, 'plots_and_ims')
-    os.makedirs(plot_dir, exist_ok=True)
-    plt.savefig(op.join(plot_dir, f'sub-{sub}_grad_vs_frames.png'), dpi=300)
+    # # Labels and title
+    # plt.xlabel(f'{x_name}')
+    # plt.ylabel(f'{y_name}')
+    # plt.title(f"Scatter plot of {x_name} vs. {y_name}, p={p_value}")
+    # plt.legend()
+    # plt.tight_layout()
+    # plot_dir = op.join(bids_folder_output, 'plots_and_ims')
+    # os.makedirs(plot_dir, exist_ok=True)
+    # plt.savefig(op.join(plot_dir, f'sub-{sub}_grad_vs_frames.png'), dpi=300)
 
 if __name__ == '__main__':
 
@@ -213,7 +214,7 @@ if __name__ == '__main__':
     parser.add_argument('subject', default='60') # based on least framewise displacement
     parser.add_argument('--bids_folder_input', default='/mnt_03/ds-dnumrisk')
     parser.add_argument('--bids_folder_output', default='/mnt_AdaBD_largefiles/Data/SMILE_DATA/DNumRisk/ds-dnumrisk')    
-    parser.add_argument('--steps', default=100, type=int)
+    parser.add_argument('--steps', default=50, type=int)
     parser.add_argument('--grad_nr', default=1, type=int)
     parser.add_argument('--confspec', default='36P') # instead of 32P
     parser.add_argument('--task', default='magjudge')
