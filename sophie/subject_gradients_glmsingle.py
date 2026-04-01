@@ -83,7 +83,7 @@ def main(sub, ses, bids_folder_cm, bids_folder_ref, specification, kernel_name, 
         grad = [None] * n_components
         for i, g in enumerate(gm_): # gm.gradients_.T
             grad[i] = map_to_labels(g, labeling_noParcel, mask=mask, fill=np.nan)
-        np.save(op.join(target_dir,f'sub-{sub}_g-aligned_space-fsaverag5_n10{specification}_stimulus-{stim}_betas_kernel-{kernel_name}{specif}.npy'), grad) # save all together    
+        np.save(op.join(target_dir,f'sub-{sub}_g-aligned_space-fsaverag5_n10{specification}_stimulus-{stim}_betas_kernel-{kernel_name}{specif}.npy'), grad) # save all together
 
 
 if __name__ == '__main__':
