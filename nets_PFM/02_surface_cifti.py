@@ -28,13 +28,25 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from config import (FMRIPREP, FREESURFER, OUTPUT_ROOT, SESSION, TASK, RUNS,
-                    TR, SMOOTH_SIGMA, WB_COMMAND, FSLR_SPHERE, FSLR_MIDTHICK,
-                    FSLR_ROI, SUBCORTICAL_LABELS)
+                    TR, SMOOTH_SIGMA, WB_COMMAND, MRIS_CONVERT,
+                    FSLR_SPHERE, FSLR_MIDTHICK, FSLR_ROI, SUBCORTICAL_LABELS)
 
 
 # ---------------------------------------------------------------------------
 # wb_command wrapper
 # ---------------------------------------------------------------------------
+
+def ensure_sphere_reg_gii(fs_surf_dir: Path, hemi_fs: str) -> Path:
+    """Return path to hemi.sphere.reg.surf.gii, converting from FreeSurfer binary if needed."""
+    gii = fs_surf_dir / f'{hemi_fs}.sphere.reg.surf.gii'
+    if not gii.exists():
+        src = fs_surf_dir / f'{hemi_fs}.sphere.reg'
+        if not src.exists():
+            raise FileNotFoundError(f'Missing sphere.reg: {src}')
+        print(f'    Converting {src.name} → {gii.name}')
+        subprocess.run([MRIS_CONVERT, str(src), str(gii)], check=True)
+    return gii
+
 
 def wb(args: list, check: bool = True) -> None:
     cmd = [WB_COMMAND] + [str(a) for a in args]
@@ -134,7 +146,7 @@ def process_run(subject: str, run: int, surf_dir: Path,
         smoothwm  = surf_dir / f'{subject}_{SESSION}_hemi-{hemi}_smoothwm.surf.gii'
         pial      = surf_dir / f'{subject}_{SESSION}_hemi-{hemi}_pial.surf.gii'
         midthick  = surf_dir / f'{subject}_{SESSION}_hemi-{hemi}_midthickness.surf.gii'
-        sphere_reg = fs_surf_dir / f'{hemi_fs}.sphere.reg.surf.gii'
+        sphere_reg = ensure_sphere_reg_gii(fs_surf_dir, hemi_fs)
 
         fsnative_gii = tmp / f'{stem}_hemi-{hemi}_space-fsnative_bold.func.gii'
         fslr_gii     = tmp / f'{stem}_hemi-{hemi}_space-fsLR32k_bold.func.gii'
@@ -208,8 +220,11 @@ def main(subject: str) -> None:
     print(f'\nDone. Session CIFTI: {concat_cifti}')
 
 
+def parse_subject(s: str) -> str:
+    return f'sub-{int(s.removeprefix("sub-")):02d}'
+
 if __name__ == '__main__':
     if len(sys.argv) != 2:
-        print('Usage: python 02_surface_cifti.py sub-XX')
+        print('Usage: python 02_surface_cifti.py <subject>  # e.g. 1, 01, or sub-01')
         sys.exit(1)
-    main(sys.argv[1])
+    main(parse_subject(sys.argv[1]))

@@ -206,8 +206,11 @@ def main(subject: str) -> None:
     print(f'\nDone. Outputs in {out_dir}')
 
 
+def parse_subject(s: str) -> str:
+    return f'sub-{int(s.removeprefix("sub-")):02d}'
+
 if __name__ == '__main__':
     if len(sys.argv) != 2:
-        print('Usage: python 01_denoise.py sub-XX')
+        print('Usage: python 01_denoise.py <subject>  # e.g. 1, 01, or sub-01')
         sys.exit(1)
-    main(sys.argv[1])
+    main(parse_subject(sys.argv[1]))

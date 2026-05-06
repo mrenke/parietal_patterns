@@ -302,8 +302,11 @@ def main(subject: str) -> None:
     print(f'\n[{subject}] Total time: {_elapsed(t_total)}')
 
 
+def parse_subject(s: str) -> str:
+    return f'sub-{int(s.removeprefix("sub-")):02d}'
+
 if __name__ == '__main__':
     if len(sys.argv) != 2:
-        print('Usage: python 03_vertex_cm.py sub-XX')
+        print('Usage: python 03_vertex_cm.py <subject>  # e.g. 1, 01, or sub-01')
         sys.exit(1)
-    main(sys.argv[1])
+    main(parse_subject(sys.argv[1]))

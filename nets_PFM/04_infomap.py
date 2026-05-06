@@ -190,6 +190,14 @@ def main(subject: str, single_density: float | None = None,
             print(f'  [skip] {cm_path.name} not found — run 03_vertex_cm.py first')
             continue
 
+        out_path = out_dir / f'{stem}_density-{d_str}{ref_tag}_communities.npz'
+        if out_path.exists():
+            print(f'  [skip] {out_path.name} already exists — loading for consensus')
+            saved = np.load(out_path)
+            all_modules.append(saved['network_labels'] if ref_labels is not None
+                               else saved['modules'])
+            continue
+
         print(f'[{subject}] Running Infomap at density={d:.3f} ...')
         t = time.perf_counter()
         csr     = sp.load_npz(cm_path)
@@ -210,11 +218,12 @@ def main(subject: str, single_density: float | None = None,
             save_kwargs['network_labels'] = net_labels
             n_nets_ref = len(np.unique(net_labels[net_labels > 0]))
             print(f'  → {n_nets_ref} reference networks assigned')
+            all_modules.append(net_labels)   # consensus on ref-aligned labels
+        else:
+            all_modules.append(modules)
 
-        out_path = out_dir / f'{stem}_density-{d_str}{ref_tag}_communities.npz'
         np.savez(out_path, **save_kwargs)
         print(f'  Saved → {out_path.name}  [{_elapsed(t)}]')
-        all_modules.append(modules)
 
     # Consensus (only if multiple densities)
     if len(all_modules) > 1:
@@ -223,21 +232,19 @@ def main(subject: str, single_density: float | None = None,
         n_nets = len(np.unique(consensus[consensus > 0]))
         print(f'  → {n_nets} consensus communities')
 
-        save_kwargs = dict(modules=consensus)
-        if ref_labels is not None:
-            net_labels = assign_network_labels(consensus, ref_labels)
-            save_kwargs['network_labels'] = net_labels
-
         out_path = out_dir / f'{stem}_consensus{ref_tag}_communities.npz'
-        np.savez(out_path, **save_kwargs)
+        np.savez(out_path, modules=consensus)
         print(f'  Saved → {out_path.name}')
 
     print(f'\n[{subject}] Total time: {_elapsed(t_total)}')
 
 
+def parse_subject(s: str) -> str:
+    return f'sub-{int(s.removeprefix("sub-")):02d}'
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('subject', help='e.g. sub-01')
+    parser.add_argument('subject', help='subject id: 1, 01, or sub-01')
     parser.add_argument('--density', type=float, default=None,
                         help='Run single density only (e.g. 0.005)')
     parser.add_argument('--ref', type=Path, default=None,
@@ -245,4 +252,4 @@ if __name__ == '__main__':
     parser.add_argument('--ref-name', type=str, default=None,
                         help='Short name for the reference atlas (used in output filenames)')
     args = parser.parse_args()
-    main(args.subject, args.density, args.ref, args.ref_name)
+    main(parse_subject(args.subject), args.density, args.ref, args.ref_name)

@@ -158,41 +158,89 @@ The full ~90k × 90k dense matrix is never materialised — computed in row-chun
 ### Step 9 — Infomap network detection (`04_infomap.py`)
 - Two-level Infomap (undirected, weighted) on each thresholded sparse graph.
 - Communities < 400 nodes removed (as in Gordon 2017).
-- Consensus assignment: mode community label across all density thresholds.
-- Requires `pip install infomap` (not yet installed on this system).
-- **Network labelling:** raw integer module IDs are output; mapping to named networks
-  (DMN, FPN, DAN, etc.) by spatial overlap with a group-average atlas is a
-  separate step needing the Gordon 2016 network atlas in fsLR 32k space.
+- **Consensus assignment (sparse → dense):** each vertex gets its label from the
+  sparsest threshold where it is assigned. Denser thresholds fill in remaining
+  unassigned vertices. Labels must be reference-aligned (comparable across
+  thresholds) before computing consensus — raw Infomap integer IDs are not
+  comparable across thresholds and must not be used directly.
+- **Network labelling:** `--ref` flag accepts a `.npz` atlas with `labels`
+  (n_all_vertices,) and `hemi` (n_all_vertices,) arrays. Medial-wall vertices
+  are filtered using HCP atlas ROI masks. For each community the plurality
+  reference label is assigned. Reference atlases available at:
+  `/mnt_03/ds-dnumrisk/derivatives/pfm_fslr/atlases/`
+    - `gordon17_space-fsLR_den-32k_cortex.npz`
+    - `caNets_DDnr-magjudge-task-average-from-fsav5_space-fsLR_den-32k_cortex.npz`
+
+### `04b_relabel.py` — Re-label without re-running Infomap
+Loads existing per-density `modules` arrays from `04_infomap.py` output,
+applies a new reference atlas, computes consensus on reference-aligned labels,
+saves `*_consensus_ref-{name}_communities.npz`. Seconds instead of hours.
+```
+python 04b_relabel.py sub-01 --ref /path/to/atlas.npz --ref-name myAtlas
+```
+
+### `run_pipeline.py` — Batch runner for all subjects
+Runs steps 01–04b for subjects 1–66 (or a subset). Features:
+- Checks key output files before each step — skips already-completed steps
+- Logs full stdout/stderr per subject to `logs/sub-XX_pipeline.log`
+- Collects retained-frame counts from scrub masks after step 01
+- Prints and saves a summary CSV (`logs/pipeline_summary_*.csv`) with
+  per-subject step status (ok / FAIL / skip / done) and frame statistics
+```
+python run_pipeline.py                    # all subjects
+python run_pipeline.py --start 10        # resume from subject 10
+python run_pipeline.py --subjects 1 2 3
+python run_pipeline.py --steps 03 04 04b
+```
 
 ### Optional utility: `03_corr_matrix.py`
 Parcellated CM (parcel-to-parcel, using a `.dlabel.nii` atlas). Not used for
 Infomap network detection, but useful for seed-based connectivity analyses,
-QC, or comparison with other datasets.
+QC, or comparison with other datasets. Requires `--parc` at runtime.
 
-## Output Structure (planned)
+## Bug fixes / implementation notes
+
+- **CoV masking (01_denoise.py):** bad voxels are set to `0`, not `NaN`.
+  NaN propagates through `wb_command -volume-to-surface-mapping` and fills the
+  CIFTI with NaN, causing all nodes to fail the variance check. The spatial CoV
+  mask is saved separately as `*_desc-covmask.npy`.
+- **sphere.reg conversion (02_surface_cifti.py):** `lh.sphere.reg.surf.gii` is
+  created automatically via `mris_convert` if only the FreeSurfer binary
+  `lh.sphere.reg` is present (all subjects except sub-01).
+- **Subject ID parsing:** all scripts accept `1`, `01`, or `sub-01` as subject
+  argument — zero-padding and `sub-` prefix are applied automatically.
+- **Infomap API (04_infomap.py):** `--undirected` is not a valid flag in
+  infomap 2.x; use `directed=False` in the constructor instead.
+
+## Output Structure
 ```
-nets_PFM/
-  outputs/
-    sub-XX/
-      denoised/   run-level denoised T1w volumes (temp)
-      surface/    run-level fsLR 32k .func.gii
-      cifti/      run-level .dtseries.nii
-      concat/     session-level concatenated .dtseries.nii
-      matrices/   parcel × parcel correlation matrices (.npy or .nii)
+/mnt_03/ds-dnumrisk/derivatives/pfm_fslr/
+  sub-XX/
+    denoised/   *_desc-denoised_bold.nii.gz (per run, retained frames only)
+                *_desc-scrubmask.npy        (bool, True = retained)
+    cifti/      *_space-fsLR32k_bold_smooth.dtseries.nii  (per run)
+                *_space-fsLR32k_bold_concat.dtseries.nii  (session)
+                tmp/run-N/  intermediate .func.gii files
+    cm/         *_density-{d}_cm.npz        (scipy sparse CSR, per density)
+                *_cm_meta.npz               (coords, hemi_ids, valid_mask)
+    networks/   *_density-{d}_ref-{name}_communities.npz
+                *_consensus_ref-{name}_communities.npz
+  atlases/      reference atlases (gordon17, caNets_DDnr)
 ```
 
 ## Status
 
 - [x] Environment checked, paths confirmed
 - [x] Pipeline design agreed (corrected vs. original 36-param plan — see pipeline_comparison.md)
-- [x] `01_denoise.py` — written
-- [x] `02_surface_cifti.py` — written (ribbon map → fsLR 32k → CIFTI → smooth → concat)
-- [x] `03_vertex_cm.py` — written (chunked vertex-wise sparse CM)
-- [x] `04_infomap.py` — written (Infomap + consensus)
-- [ ] Test on sub-01 (run all 4 scripts end-to-end)
-- [x] infomap 2.8.0 available in `numrefields` conda env (all deps confirmed)
-- [ ] Obtain network labelling atlas (Gordon 2016 networks in fsLR 32k)
-- [ ] Apply to all subjects
+- [x] `01_denoise.py` — written + bug-fixed (CoV mask: NaN → 0)
+- [x] `02_surface_cifti.py` — written + auto sphere.reg conversion
+- [x] `03_vertex_cm.py` — written (chunked vertex-wise sparse CM + timing)
+- [x] `04_infomap.py` — written (Infomap + sparse→dense consensus + ref labelling)
+- [x] `04b_relabel.py` — written (relabel only, no Infomap re-run)
+- [x] `run_pipeline.py` — written (batch runner, completion checks, frame table)
+- [x] Tested end-to-end on sub-01
+- [x] Reference atlases in place (gordon17, caNets_DDnr) in fsLR 32k .npz format
+- [x] Pipeline running on all subjects (1–66) overnight
 
 ## References
 

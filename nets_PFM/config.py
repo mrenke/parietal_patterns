@@ -11,7 +11,8 @@ BIDS_ROOT_OUT = BIDS_ROOT   # e.g. Path('/mnt_04/ds-dnumrisk') if redirecting
 OUTPUT_ROOT   = BIDS_ROOT_OUT / 'derivatives' / 'pfm_fslr'
 
 # --- Tools ---
-WB_COMMAND = '/home/ubuntu/workbench/bin_linux64/wb_command'
+WB_COMMAND    = '/home/ubuntu/workbench/bin_linux64/wb_command'
+MRIS_CONVERT  = '/home/ubuntu/freesurfer/bin/mris_convert'
 
 # --- Template surfaces ---
 HCP_ATLASES  = Path('/home/ubuntu/git/HCPpipelines/global/templates/standard_mesh_atlases')
