@@ -203,11 +203,21 @@ def main(subject: str) -> None:
                       '_space-T1w_desc-aparcaseg_dseg.nii.gz')
     label_vol, _ = make_label_volume(aparcaseg_run1, out_dir)
 
+    skipped = []
     run_ciftis = []
     for run in RUNS:
+        denoised_path = (OUTPUT_ROOT / subject / 'denoised' /
+                         f'{subject}_{SESSION}_task-{TASK}_run-{run}_desc-denoised_bold.nii.gz')
+        if not denoised_path.exists():
+            print(f'\n[{subject}] run-{run}  [SKIP — denoised output missing]')
+            skipped.append(run)
+            continue
         print(f'\n[{subject}] run-{run}')
         cifti = process_run(subject, run, surf_dir, label_vol, out_dir)
         run_ciftis.append(cifti)
+
+    if skipped:
+        print(f'\nWarning: skipped runs with missing denoised outputs: {skipped}')
 
     # Concatenate all runs
     print(f'\n[{subject}] Concatenating {len(run_ciftis)} runs ...')

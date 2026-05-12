@@ -200,10 +200,22 @@ def main(subject: str) -> None:
     out_dir = OUTPUT_ROOT / subject / 'denoised'
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    skipped = []
     for run in RUNS:
+        func_dir  = FMRIPREP / subject / SESSION / 'func'
+        stem      = f'{subject}_{SESSION}_task-{TASK}_run-{run}'
+        bold_path = func_dir / f'{stem}_space-T1w_desc-preproc_bold.nii.gz'
+        conf_path = func_dir / f'{stem}_desc-confounds_timeseries.tsv'
+        if not bold_path.exists() or not conf_path.exists():
+            print(f'\n[{subject}] run-{run}  [SKIP — fMRIPrep outputs missing]')
+            skipped.append(run)
+            continue
         print(f'\n[{subject}] run-{run}')
         denoise_run(subject, run, out_dir)
-    print(f'\nDone. Outputs in {out_dir}')
+
+    if skipped:
+        print(f'\nWarning: skipped runs with missing fMRIPrep outputs: {skipped}')
+    print(f'Done. Outputs in {out_dir}')
 
 
 def parse_subject(s: str) -> str:

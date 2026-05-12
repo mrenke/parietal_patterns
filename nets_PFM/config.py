@@ -56,6 +56,46 @@ COV_SD_THRESH = 0.5   # SDs above local mean CoV → voxel excluded
 # --- Smoothing ---
 SMOOTH_SIGMA = 2.55   # mm (geodesic on surface, Euclidean on volume)
 
+# --- Network label names by reference atlas ---
+# Used in analysis notebooks; kept here so all scripts share one source of truth.
+ATLAS_NETWORK_NAMES = {
+    'gordon17': {
+        0:  'Unassigned',
+        1:  'Default',
+        2:  'LatVis',
+        3:  'FrontPar',
+        4:  'MedVis',
+        5:  'DorsAttn',
+        6:  'Premotor',
+        7:  'Language',
+        8:  'Salience',
+        9:  'CingOperc',
+        10: 'HandSM',
+        11: 'FaceSM',
+        12: 'Auditory',
+        13: 'AntMTL',
+        14: 'PostMTL',
+        15: 'ParMemory',
+        16: 'Context',
+        17: 'FootSM',
+    },
+    'caNets_DDnr': {
+        0:  'Unassigned',
+        1:  'Visual1',
+        2:  'Visual2',
+        3:  'Somatomotor',
+        4:  'Cingulo-Opercular',
+        5:  'Dorsal-attention',
+        6:  'Language',
+        7:  'Frontoparietal',
+        8:  'Auditory',
+        9:  'Default',
+        10: 'Posterior-Multimodal',
+        11: 'Ventral-Multimodal',
+        12: 'Orbito-Affective',
+    },
+}
+
 # --- Subcortical structures: aparc+aseg label → (cifti_int, CIFTI_structure_name)
 # Cerebellar cortex only (8=L, 47=R). WM (7, 46) excluded for simplicity.
 SUBCORTICAL_LABELS = {

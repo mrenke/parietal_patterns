@@ -43,3 +43,26 @@ def get_gordon17_cmap():
 
     cmap_gordon = ListedColormap(GORDON17_COLORS)
     return cmap_gordon, network_names
+
+import nibabel as nib
+import os.path as op
+
+def get_template_vertex_area(NEUROMAPS_FSLR):
+    # Medial-wall mask — tells us which of the 32492 L/R vertices are valid cortex
+    # (excludes medial wall; produces 29696 L + 29716 R = 59412 nodes total)
+    mw_L = nib.load(op.join(NEUROMAPS_FSLR, 'tpl-fsLR_den-32k_hemi-L_desc-nomedialwall_dparc.label.gii'))
+    mw_R = nib.load(op.join(NEUROMAPS_FSLR, 'tpl-fsLR_den-32k_hemi-R_desc-nomedialwall_dparc.label.gii'))
+    cortex_mask_L = mw_L.darrays[0].data.astype(bool)   # (32492,)
+    cortex_mask_R = mw_R.darrays[0].data.astype(bool)   # (32492,)
+
+    # Template vertex areas (group-average fsLR32k)
+    tpl_va_L = nib.load(op.join(NEUROMAPS_FSLR, 'tpl-fsLR_den-32k_hemi-L_desc-vaavg_midthickness.shape.gii')).darrays[0].data  # (32492,)
+    tpl_va_R = nib.load(op.join(NEUROMAPS_FSLR, 'tpl-fsLR_den-32k_hemi-R_desc-vaavg_midthickness.shape.gii')).darrays[0].data
+
+    # Concatenated template areas for valid cortical nodes only (59412,)
+    tpl_vertex_areas = np.concatenate([tpl_va_L[cortex_mask_L], tpl_va_R[cortex_mask_R]])
+
+    print(f'Valid cortical nodes: L={cortex_mask_L.sum()}, R={cortex_mask_R.sum()}, total={tpl_vertex_areas.shape[0]}')
+    print(f'Total template cortical area: {tpl_vertex_areas.sum():.0f} mm² ({tpl_vertex_areas.sum()/100:.1f} cm²)')
+    return tpl_vertex_areas, cortex_mask_L, cortex_mask_R
+

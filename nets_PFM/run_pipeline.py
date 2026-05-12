@@ -20,7 +20,6 @@ Usage:
 """
 import argparse
 import subprocess
-import sys
 import time
 import numpy as np
 import pandas as pd
@@ -45,7 +44,7 @@ CONDA_ENV   = 'numrefields'
 PYTHON      = ['conda', 'run', '--no-capture-output', '-n', CONDA_ENV, 'python', '-u']
 
 ALL_SUBJECTS = list(range(1, 67))
-ALL_STEPS    = ['01', '02', '03', '04', '04b', '05']
+ALL_STEPS    = ['01', '02', '03', '04', '04b', '05', '06']
 
 SESSION = 'ses-1'
 TASK    = 'magjudge'
@@ -65,19 +64,23 @@ def elapsed(t0: float) -> str:
     return f'{s/60:.1f} min' if s >= 60 else f'{s:.1f} s'
 
 
-def run_step(cmd: list, log_path: Path) -> bool:
-    """Run a command, tee output to log_path. Returns True on success."""
+def run_step(cmd, log_path: Path) -> bool:
+    """Run one command or a sequence of commands, tee output to log_path."""
+    cmds = cmd if isinstance(cmd[0], list) else [cmd]
     with open(log_path, 'a') as fh:
-        fh.write(f'\n{"="*60}\n')
-        fh.write(f'CMD: {" ".join(str(c) for c in cmd)}\n')
-        fh.write(f'START: {datetime.now():%Y-%m-%d %H:%M:%S}\n')
-        fh.write(f'{"="*60}\n')
-        fh.flush()
-        result = subprocess.run(cmd, stdout=fh, stderr=subprocess.STDOUT)
-        fh.write(f'\n{"="*60}\n')
-        fh.write(f'END: {datetime.now():%Y-%m-%d %H:%M:%S}  '
-                 f'returncode={result.returncode}\n')
-    return result.returncode == 0
+        for c in cmds:
+            fh.write(f'\n{"="*60}\n')
+            fh.write(f'CMD: {" ".join(str(x) for x in c)}\n')
+            fh.write(f'START: {datetime.now():%Y-%m-%d %H:%M:%S}\n')
+            fh.write(f'{"="*60}\n')
+            fh.flush()
+            result = subprocess.run(c, stdout=fh, stderr=subprocess.STDOUT)
+            fh.write(f'\n{"="*60}\n')
+            fh.write(f'END: {datetime.now():%Y-%m-%d %H:%M:%S}  '
+                     f'returncode={result.returncode}\n')
+            if result.returncode != 0:
+                return False
+    return True
 
 
 def get_frame_counts(subject: str) -> dict:
@@ -126,13 +129,24 @@ def is_done(subject: str, step: str) -> bool:
              f'{stem}_density-{f"{d:.3f}".replace("0.", "")}_cm.npz').exists()
             for d in [0.003, 0.005, 0.01, 0.02, 0.03, 0.05]
         ),
-        '04':  (sub_dir / 'networks' /
-                f'{stem}_consensus_ref-gordon17_communities.npz').exists(),
-        '04b': (sub_dir / 'networks' /
-                f'{stem}_consensus_ref-caNets_DDnr_communities.npz').exists(),
+        '04':  all(
+            (sub_dir / 'networks' /
+             f'{stem}_density-{f"{d:.3f}".replace("0.", "")}_communities.npz').exists()
+            for d in [0.003, 0.005, 0.01, 0.02, 0.03, 0.05]
+        ),
+        '04b': all(
+            (sub_dir / 'networks' /
+             f'{stem}_consensus_ref-{r}_communities.npz').exists()
+            for r in ('gordon17', 'caNets_DDnr')
+        ),
         '05':  all(
             (PLOT_DIR / f'{subject}_ref-{r}_networks.png').exists()
             for r in ('gordon17', 'caNets_DDnr')
+        ),
+        '06':  all(
+            (sub_dir / 'anat' /
+             f'{subject}_{SESSION}_hemi-{h}_vertex_areas_fsLR32k.shape.gii').exists()
+            for h in ('L', 'R')
         ),
     }
     return checks[step]
@@ -148,11 +162,15 @@ def step_cmds(subject: str) -> dict:
         '01': PYTHON + [str(SCRIPT_DIR / '01_denoise.py'), n],
         '02': PYTHON + [str(SCRIPT_DIR / '02_surface_cifti.py'), n],
         '03': PYTHON + [str(SCRIPT_DIR / '03_vertex_cm.py'), n],
-        '04': PYTHON + [str(SCRIPT_DIR / '04_infomap.py'), n,
-                        '--ref', str(REF_GORDON), '--ref-name', 'gordon17'],
-        '04b': PYTHON + [str(SCRIPT_DIR / '04b_relabel.py'), n,
-                         '--ref', str(REF_CANETS), '--ref-name', 'caNets_DDnr'],
+        '04':  PYTHON + [str(SCRIPT_DIR / '04_infomap.py'), n],
+        '04b': [
+            PYTHON + [str(SCRIPT_DIR / '04b_relabel.py'), n,
+                      '--ref', str(REF_GORDON), '--ref-name', 'gordon17'],
+            PYTHON + [str(SCRIPT_DIR / '04b_relabel.py'), n,
+                      '--ref', str(REF_CANETS), '--ref-name', 'caNets_DDnr'],
+        ],
         '05':  PYTHON + [str(SCRIPT_DIR / '05_plot.py'), n],
+        '06':  PYTHON + [str(SCRIPT_DIR / '06_comp_indVertexArea.py'), n],
     }
 
 
@@ -186,14 +204,19 @@ def main(subjects: list[int], steps: list[str]) -> None:
 
         failed = False
         for step in steps:
-            if failed and step not in ('04b',):
-                # skip downstream steps after a failure, but allow 04b
-                # to run independently if 04 succeeded on a prior run
+            if failed and step not in ('04b', '06'):
+                # skip downstream steps after a failure, but allow 04b/06
+                # to run independently if their specific prerequisites succeeded
                 results[sub_n][step] = 'skip'
                 continue
 
-            # For 04b, only skip if 03 failed (it needs the CM outputs)
-            if step == '04b' and results[sub_n].get('03') == 'FAIL':
+            # 04b needs modules files from step 04
+            if step == '04b' and results[sub_n].get('04') == 'FAIL':
+                results[sub_n][step] = 'skip'
+                continue
+
+            # 06 only needs surfaces from step 02
+            if step == '06' and results[sub_n].get('02') == 'FAIL':
                 results[sub_n][step] = 'skip'
                 continue
 

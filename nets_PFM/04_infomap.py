@@ -9,28 +9,17 @@ Gordon 2017 protocol:
   - Two-level Infomap on undirected weighted graph
   - Thresholds from 0.3% to 5% density
   - Small communities (< 400 nodes) removed
-  - Network identities assigned by spatial overlap with a reference atlas
   - Consensus assignment by collapsing across density thresholds
 
-Saved files (OUTPUT_ROOT/sub-XX/networks/):
-  Without --ref:
-    sub-XX_ses-1_space-fsLR32k_density-{d}_communities.npz
-    sub-XX_ses-1_space-fsLR32k_consensus_communities.npz
-  With --ref:
-    sub-XX_ses-1_space-fsLR32k_density-{d}_ref-{name}_communities.npz
-    sub-XX_ses-1_space-fsLR32k_consensus_ref-{name}_communities.npz
-    Each .npz adds 'network_labels': plurality-vote reference label per node.
+Reference-atlas labelling is done separately in 04b_relabel.py.
 
-Reference atlas format (.npz):
-  labels : (n_all_vertices,) int32  — network label per fsLR 32k vertex
-  hemi   : (n_all_vertices,) str    — 'L' or 'R' per vertex
-  (medial-wall vertices are filtered out using the HCP atlas ROI masks)
+Saved files (OUTPUT_ROOT/sub-XX/networks/):
+  sub-XX_ses-1_space-fsLR32k_density-{d}_communities.npz  → modules, density
+  sub-XX_ses-1_space-fsLR32k_consensus_communities.npz     → modules
 
 Usage:
   python 04_infomap.py sub-01
   python 04_infomap.py sub-01 --density 0.005
-  python 04_infomap.py sub-01 --ref /path/to/atlas.npz
-  python 04_infomap.py sub-01 --ref /path/to/atlas.npz --ref-name myAtlas
 """
 import sys
 import time
@@ -108,9 +97,7 @@ def consensus_assignment(all_modules: list[np.ndarray]) -> np.ndarray:
 
 
 # ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
-# Reference atlas alignment and network label assignment
+# Reference atlas helpers (used by 04b_relabel.py via importlib)
 # ---------------------------------------------------------------------------
 
 def load_reference_labels(ref_path: Path) -> np.ndarray:
@@ -158,26 +145,11 @@ def _elapsed(t0: float) -> str:
     return f'{s/60:.1f} min' if s >= 60 else f'{s:.1f} s'
 
 
-def main(subject: str, single_density: float | None = None,
-         ref_path: Path | None = None, ref_name: str | None = None) -> None:
+def main(subject: str, single_density: float | None = None) -> None:
     t_total = time.perf_counter()
     cm_dir  = OUTPUT_ROOT / subject / 'cm'
     out_dir = OUTPUT_ROOT / subject / 'networks'
     out_dir.mkdir(parents=True, exist_ok=True)
-
-    meta       = np.load(cm_dir / f'{subject}_{SESSION}_space-fsLR32k_cm_meta.npz')
-    valid_mask = meta['valid_mask']   # (n_cifti_nodes,) bool
-
-    # Load and align reference labels if provided
-    ref_labels = None
-    ref_tag    = ''
-    if ref_path is not None:
-        print(f'[{subject}] Loading reference atlas: {ref_path.name}')
-        ref_labels_cifti = load_reference_labels(ref_path)
-        ref_labels = ref_labels_cifti[valid_mask]
-        ref_tag = f'_ref-{ref_name or ref_path.name.split("_space-")[0]}'
-        print(f'  {len(np.unique(ref_labels[ref_labels > 0]))} reference networks, '
-              f'{ref_labels.shape[0]} nodes')
 
     stem = f'{subject}_{SESSION}_space-fsLR32k'
     densities = [single_density] if single_density else INFOMAP_DENSITIES
@@ -190,12 +162,10 @@ def main(subject: str, single_density: float | None = None,
             print(f'  [skip] {cm_path.name} not found — run 03_vertex_cm.py first')
             continue
 
-        out_path = out_dir / f'{stem}_density-{d_str}{ref_tag}_communities.npz'
+        out_path = out_dir / f'{stem}_density-{d_str}_communities.npz'
         if out_path.exists():
             print(f'  [skip] {out_path.name} already exists — loading for consensus')
-            saved = np.load(out_path)
-            all_modules.append(saved['network_labels'] if ref_labels is not None
-                               else saved['modules'])
+            all_modules.append(np.load(out_path)['modules'])
             continue
 
         print(f'[{subject}] Running Infomap at density={d:.3f} ...')
@@ -209,30 +179,19 @@ def main(subject: str, single_density: float | None = None,
 
         n_assigned = (modules > 0).sum()
         n_nets     = len(np.unique(modules[modules > 0]))
-        print(f'  → {n_nets} communities, '
-              f'{100*n_assigned/n_nodes:.1f}% nodes assigned')
+        print(f'  → {n_nets} communities, {100*n_assigned/n_nodes:.1f}% nodes assigned')
 
-        save_kwargs = dict(modules=modules, density=np.array([d]))
-        if ref_labels is not None:
-            net_labels = assign_network_labels(modules, ref_labels)
-            save_kwargs['network_labels'] = net_labels
-            n_nets_ref = len(np.unique(net_labels[net_labels > 0]))
-            print(f'  → {n_nets_ref} reference networks assigned')
-            all_modules.append(net_labels)   # consensus on ref-aligned labels
-        else:
-            all_modules.append(modules)
-
-        np.savez(out_path, **save_kwargs)
+        np.savez(out_path, modules=modules, density=np.array([d]))
         print(f'  Saved → {out_path.name}  [{_elapsed(t)}]')
+        all_modules.append(modules)
 
-    # Consensus (only if multiple densities)
     if len(all_modules) > 1:
         print(f'[{subject}] Computing consensus across {len(all_modules)} thresholds ...')
         consensus = consensus_assignment(all_modules)
         n_nets = len(np.unique(consensus[consensus > 0]))
         print(f'  → {n_nets} consensus communities')
 
-        out_path = out_dir / f'{stem}_consensus{ref_tag}_communities.npz'
+        out_path = out_dir / f'{stem}_consensus_communities.npz'
         np.savez(out_path, modules=consensus)
         print(f'  Saved → {out_path.name}')
 
@@ -247,9 +206,5 @@ if __name__ == '__main__':
     parser.add_argument('subject', help='subject id: 1, 01, or sub-01')
     parser.add_argument('--density', type=float, default=None,
                         help='Run single density only (e.g. 0.005)')
-    parser.add_argument('--ref', type=Path, default=None,
-                        help='Reference atlas .npz for network label assignment')
-    parser.add_argument('--ref-name', type=str, default=None,
-                        help='Short name for the reference atlas (used in output filenames)')
     args = parser.parse_args()
-    main(parse_subject(args.subject), args.density, args.ref, args.ref_name)
+    main(parse_subject(args.subject), args.density)
