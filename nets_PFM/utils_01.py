@@ -66,3 +66,35 @@ def get_template_vertex_area(NEUROMAPS_FSLR):
     print(f'Total template cortical area: {tpl_vertex_areas.sum():.0f} mm² ({tpl_vertex_areas.sum()/100:.1f} cm²)')
     return tpl_vertex_areas, cortex_mask_L, cortex_mask_R
 
+def load_individual_vertex_areas(PFM_ROOT, SUBJECTS, NEUROMAPS_FSLR=  '/home/ubuntu/neuromaps-data/atlases/fsLR'):
+    _, cortex_mask_L, cortex_mask_R = get_template_vertex_area(NEUROMAPS_FSLR)
+
+    ind_areas_dict = {}
+    for sub_id in SUBJECTS:
+        sub_str = f'sub-{sub_id:02d}'
+        areas = []
+        ok = True
+        for hemi, mask in [('L', cortex_mask_L), ('R', cortex_mask_R)]:
+            path = op.join(PFM_ROOT, sub_str, 'anat',
+                        f'{sub_str}_ses-1_hemi-{hemi}_vertex_areas_fsLR32k.shape.gii')
+            if not op.exists(path):
+                print(f'  sub-{sub_id:02d}: missing hemi-{hemi} — run 06_comp_indVertexArea.py')
+                ok = False
+                break
+            va_full = nib.load(path).darrays[0].data  # (32492,)
+            areas.append(va_full[mask])               # keep valid cortex only
+        if ok:
+            ind_areas_dict[sub_id] = np.concatenate(areas)  # (59412,)
+
+    print(f'Individual areas loaded for {len(ind_areas_dict)} subjects')
+    return ind_areas_dict
+
+
+def array_to_gifti(arr):
+    darray = nib.gifti.GiftiDataArray(
+        data=arr.astype(np.float32),
+        intent=nib.nifti1.intent_codes['NIFTI_INTENT_NONE'],
+        datatype='NIFTI_TYPE_FLOAT32'
+    )
+    return nib.gifti.GiftiImage(darrays=[darray])
+
