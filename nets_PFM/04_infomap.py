@@ -30,9 +30,10 @@ import scipy.sparse as sp
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from config import OUTPUT_ROOT, SESSION, INFOMAP_DENSITIES, FSLR_ROI
+from config import OUTPUT_ROOT, SESSION, INFOMAP_DENSITIES, FSLR_ROI, FSLR_MIDTHICK
 
 MIN_COMMUNITY_SIZE = 400   # communities smaller than this are marked unassigned
+MIN_PATCH_AREA_MM2 = 30.0  # spatial patches smaller than this are removed + dilated (Gordon 2017)
 
 
 # ---------------------------------------------------------------------------
@@ -134,6 +135,129 @@ def assign_network_labels(modules: np.ndarray,
         vals, counts = np.unique(votes, return_counts=True)
         network_labels[mask] = vals[np.argmax(counts)]
     return network_labels
+
+
+# ---------------------------------------------------------------------------
+# Spatial patch filter (Gordon 2017: remove pieces < 30 mm², dilate neighbours)
+# ---------------------------------------------------------------------------
+
+def _build_surface_adj_and_areas(surf_path: Path):
+    """Sparse CSR adjacency + per-vertex area (mm²) from a .surf.gii."""
+    surf   = nib.load(surf_path)
+    coords = surf.darrays[0].data          # (n_verts, 3)
+    faces  = surf.darrays[1].data          # (n_faces, 3)
+    n = coords.shape[0]
+    i = np.concatenate([faces[:,0], faces[:,1], faces[:,2]])
+    j = np.concatenate([faces[:,1], faces[:,2], faces[:,0]])
+    adj = sp.csr_matrix((np.ones(len(i)), (i, j)), shape=(n, n))
+    v0, v1, v2 = coords[faces[:,0]], coords[faces[:,1]], coords[faces[:,2]]
+    face_areas = 0.5 * np.linalg.norm(np.cross(v1 - v0, v2 - v0), axis=1)
+    vert_areas = np.zeros(n)
+    np.add.at(vert_areas, faces[:,0], face_areas / 3)
+    np.add.at(vert_areas, faces[:,1], face_areas / 3)
+    np.add.at(vert_areas, faces[:,2], face_areas / 3)
+    return adj, vert_areas
+
+
+def _dilate_into_removed(full_map: np.ndarray, adj: sp.csr_matrix,
+                          cortex_mask: np.ndarray) -> np.ndarray:
+    """
+    BFS dilation: fill cortex vertices with label==0 using the most-common
+    nonzero label among their surface neighbours. Propagates inward one
+    vertex at a time (as in Gordon 2017) until all reachable gaps are filled.
+    """
+    from collections import deque
+    result = full_map.copy()
+    queue: deque = deque()
+    in_queue: set = set()
+    for v in np.where(cortex_mask & (result == 0))[0]:
+        nbs = adj.indices[adj.indptr[v]:adj.indptr[v+1]]
+        if np.any(result[nbs] > 0):
+            queue.append(v)
+            in_queue.add(v)
+    while queue:
+        v = queue.popleft()
+        in_queue.discard(v)
+        if result[v] != 0:
+            continue
+        nbs = adj.indices[adj.indptr[v]:adj.indptr[v+1]]
+        nz = result[nbs]
+        nz = nz[nz > 0]
+        if len(nz) == 0:
+            continue
+        vals, counts = np.unique(nz, return_counts=True)
+        result[v] = vals[np.argmax(counts)]
+        for nb in nbs:
+            if cortex_mask[nb] and result[nb] == 0 and nb not in in_queue:
+                queue.append(nb)
+                in_queue.add(nb)
+    return result
+
+
+def _filter_hemi(full_map: np.ndarray, adj: sp.csr_matrix,
+                  vert_areas: np.ndarray, cortex_mask: np.ndarray,
+                  min_area_mm2: float) -> tuple:
+    """Remove patches < min_area_mm2 then dilate neighbours inward."""
+    from scipy.sparse.csgraph import connected_components
+    result = full_map.copy()
+    n_removed = 0
+    for lbl in np.unique(result[result > 0]):
+        verts = np.where(result == lbl)[0]
+        sub_adj = adj[verts][:, verts]
+        n_comp, comp_ids = connected_components(sub_adj, directed=False)
+        for c in range(n_comp):
+            patch = verts[comp_ids == c]
+            if vert_areas[patch].sum() < min_area_mm2:
+                result[patch] = 0
+                n_removed += len(patch)
+    result = _dilate_into_removed(result, adj, cortex_mask)
+    return result, n_removed
+
+
+def filter_small_patches(network_labels: np.ndarray,
+                          valid_mask: np.ndarray,
+                          min_area_mm2: float = MIN_PATCH_AREA_MM2) -> np.ndarray:
+    """
+    Remove contiguous surface patches < min_area_mm2 and fill by dilation
+    (Gordon et al. 2017: 30 mm² threshold on fsLR 32k template surface).
+
+    Parameters
+    ----------
+    network_labels : (n_valid,) int32 — reference network labels for valid vertices
+    valid_mask     : (n_cortex,) bool — which of the ~59k cortical vertices are valid
+    min_area_mm2   : area threshold in mm² (default 30)
+
+    Returns
+    -------
+    Filtered network_labels in the same (n_valid,) space.
+    """
+    roi_L = nib.load(FSLR_ROI['L']).darrays[0].data.astype(bool)   # (32492,)
+    roi_R = nib.load(FSLR_ROI['R']).darrays[0].data.astype(bool)   # (32492,)
+    n_cortex_L = roi_L.sum()
+
+    adj_L, areas_L = _build_surface_adj_and_areas(FSLR_MIDTHICK['L'])
+    adj_R, areas_R = _build_surface_adj_and_areas(FSLR_MIDTHICK['R'])
+
+    # Expand valid-mask labels → full cortex space
+    cortex_labels = np.zeros(n_cortex_L + roi_R.sum(), dtype=np.int32)
+    cortex_labels[valid_mask] = network_labels
+
+    # Expand cortex space → full 32k hemisphere arrays
+    full_L = np.zeros(32492, dtype=np.int32)
+    full_L[roi_L] = cortex_labels[:n_cortex_L]
+    full_R = np.zeros(32492, dtype=np.int32)
+    full_R[roi_R] = cortex_labels[n_cortex_L:]
+
+    full_L, rm_L = _filter_hemi(full_L, adj_L, areas_L, roi_L, min_area_mm2)
+    full_R, rm_R = _filter_hemi(full_R, adj_R, areas_R, roi_R, min_area_mm2)
+
+    if rm_L + rm_R > 0:
+        print(f'  Patch filter: {rm_L + rm_R} vertices removed and filled '
+              f'({rm_L} L, {rm_R} R)')
+
+    # Collapse back → valid_mask space
+    cortex_new = np.concatenate([full_L[roi_L], full_R[roi_R]])
+    return cortex_new[valid_mask].astype(np.int32)
 
 
 # ---------------------------------------------------------------------------

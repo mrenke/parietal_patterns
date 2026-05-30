@@ -178,7 +178,7 @@ def step_cmds(subject: str) -> dict:
 # Main
 # ---------------------------------------------------------------------------
 
-def main(subjects: list[int], steps: list[str]) -> None:
+def main(subjects: list[int], steps: list[str], force: bool = False) -> None:
     LOG_DIR.mkdir(exist_ok=True)
     t_pipeline = time.perf_counter()
 
@@ -220,7 +220,7 @@ def main(subjects: list[int], steps: list[str]) -> None:
                 results[sub_n][step] = 'skip'
                 continue
 
-            if is_done(subject, step):
+            if not force and is_done(subject, step):
                 results[sub_n][step] = 'done'
                 print(f'  [{subject}] step {step} ... done (skipping)')
                 continue
@@ -286,6 +286,8 @@ if __name__ == '__main__':
     parser.add_argument('--steps', nargs='+', default=ALL_STEPS,
                         choices=ALL_STEPS,
                         help='Steps to run (default: all)')
+    parser.add_argument('--force', action='store_true',
+                        help='Re-run steps even if output files already exist')
     args = parser.parse_args()
 
     if args.subjects:
@@ -295,4 +297,4 @@ if __name__ == '__main__':
     else:
         subjects = ALL_SUBJECTS
 
-    main(subjects, args.steps)
+    main(subjects, args.steps, force=args.force)

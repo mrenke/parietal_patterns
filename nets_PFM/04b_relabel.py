@@ -30,6 +30,7 @@ _spec.loader.exec_module(_mod)
 load_reference_labels = _mod.load_reference_labels
 assign_network_labels = _mod.assign_network_labels
 consensus_assignment  = _mod.consensus_assignment
+filter_small_patches  = _mod.filter_small_patches
 
 
 def find_modules_file(out_dir: Path, stem: str, d_str: str) -> Path | None:
@@ -79,6 +80,11 @@ def main(subject: str, ref_path: Path, ref_name: str | None,
     net_labels = consensus
     n_nets     = len(np.unique(net_labels[net_labels > 0]))
     print(f'  → {n_nets} reference networks in consensus')
+
+    # Remove spatial patches < 30 mm² and fill by dilation (Gordon 2017)
+    net_labels = filter_small_patches(net_labels, valid_mask)
+    n_nets_filtered = len(np.unique(net_labels[net_labels > 0]))
+    print(f'  → {n_nets_filtered} networks after spatial patch filter')
 
     out_path = out_dir / f'{stem}_consensus{ref_tag}_communities.npz'
     np.savez(out_path, modules=consensus, network_labels=net_labels)

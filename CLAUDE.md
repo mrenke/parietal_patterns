@@ -11,11 +11,11 @@ How is individual-specific functional network organization in parietal cortex di
 
 | Name | BIDS root | N | Task | Notes |
 |------|-----------|---|------|-------|
-| **DNumRisk** | `/mnt_AdaBD_largefiles/Data/SMILE_Data/DNumRisk/ds-dnumrisk` | 66 | `task-magjudge` (magnitude judgment, 6 runs/subject) | **Main dataset** — ~half dyscalculia, ~half controls |
-| **NumRisk** | `/mnt_AdaBD_largefiles/Data/SMILE_Data/DNumRisk/ds-numrisk` | 64 | same task | All healthy controls — replication cohort |
+| **DNumRisk** | `/mnt_AdaBD_largefiles/Data/SMILE_Data/DNumRisk/ds-dnumrisk` , `/mnt_03/ds-dnumrisk` | 66 | `magjudge` (magnitude comparison, 6 runs/subject) | **Main dataset** — ~half dyscalculia, ~half controls |
+| **NumRisk** | `/mnt_AdaBD_largefiles/Data/SMILE_Data/DNumRisk/ds-numrisk` , `/mnt_04/ds-numrisk` | 64 | `magjudge` | All healthy controls — replication cohort |
 | **Numberline** | `/mnt_AdaBD_largefiles/Data/SMILE_Data/DNumRisk/ds-numberline` | — | numberline task | Dyscalculics + controls, multiple sessions |
-| **SMILE** | `/mnt_AdaBD_largefiles/Data/SMILE_Data/DNumRisk/ds-smile` | — | arithmetic | Dyscalculics + controls, multiple sessions |
-| **StressRisk** | `/mnt_AdaBD_largefiles/Data/SMILE_Data/DNumRisk/ds-stressrisk` | — | — | Separate cohort, network reliability check |
+| **SMILE** | `/mnt_AdaBD_largefiles/Data/SMILE_Data/DNumRisk/ds-smile` | ~ 30 (ongoing!) |`magjudge` , `placevalue`, `rest` | Dyscalculics + controls, multiple sessions |
+| **StressRisk** | `/mnt_AdaBD_largefiles/Data/SMILE_Data/DNumRisk/ds-stressrisk` | 50 | risk | Separate cohort, network reliability check |
 
 Atlases and parcellations:
 `/mnt_AdaBD_largefiles/Data/SMILE_Data/DNumRisk/atlases_parcellations/`
