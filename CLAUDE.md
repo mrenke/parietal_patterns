@@ -30,7 +30,7 @@ See `DATA_OVERVIEW.md` for a full audit of derivative folders on the data server
 
 | Folder | Dataset(s) | Method | Notes |
 |--------|-----------|--------|-------|
-| `nets_PFM/` | DNumRisk | Precision functional mapping (Gordon 2017, fsLR 32k, Infomap) | Pipeline running on all 66 subjects — **see `nets_PFM/CLAUDE.md`** |
+| `nets_PFM/` | DNumRisk | Precision functional mapping (Gordon 2017, fsLR 32k, Infomap) + group-level NPC/DAN-patch analysis | Pipeline complete (65 subjects); NPC network sizes and DAN patch topology compared DD vs TD — **see `nets_PFM/CLAUDE.md`** |
 
 ### 🔵 ANALYSIS COMPLETE (archived or pending group-level work)
 

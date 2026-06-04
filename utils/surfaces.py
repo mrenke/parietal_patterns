@@ -30,3 +30,37 @@ def get_basic_mask():
     labeling_noParcel = np.arange(0,len(labeling),1,dtype = int)     # Map gradients to original parcels
     mask = ~np.isin(labeling, masked_labels)
     return mask, labeling_noParcel
+
+
+
+# ── Precompute adjacency once (shared across subjects) ─────────────────────
+def build_adj_and_coords(surf_path):
+    from scipy.sparse import csr_matrix
+    from scipy.sparse.csgraph import connected_components
+    from scipy.spatial.distance import cdist
+
+    surf = nib.load(surf_path)
+    coords = surf.darrays[0].data          # (32492, 3)
+    faces  = surf.darrays[1].data          # (n_faces, 3)
+    n = coords.shape[0]
+    i = np.concatenate([faces[:,0], faces[:,1], faces[:,2]])
+    j = np.concatenate([faces[:,1], faces[:,2], faces[:,0]])
+    adj = csr_matrix((np.ones(len(i)), (i, j)), shape=(n, n))
+    return adj, coords
+
+def centroid_to_lobe(centroid):
+    """Approximate anatomical lobe label from patch centroid (fsLR MNI-like coords)."""
+    x, y, z = centroid
+    ax = abs(x)
+    if y < -30 and z > 20:
+        return 'parietal-lateral'
+    if ax < 20 and z > 30:
+        return 'frontal-medial-dorsal'
+    if y > -20 and z > 15 and ax > 15:
+        return 'frontal-lateral'
+    if z < 5 and ax > 30 and y < -10:
+        return 'temporal'
+    if y > 30 and z < 20:
+        return 'frontal-medial'
+    return 'frontal-insula'
+

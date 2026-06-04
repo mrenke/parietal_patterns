@@ -114,6 +114,11 @@ def compute_cov_mask(data2d: np.ndarray, vol_shape: tuple,
     Exclude voxels with CoV > local_mean_CoV + COV_SD_THRESH * local_std_CoV.
     Locality defined by Gaussian smoothing (sigma ≈ FWHM/2.355).
     Returns 3D boolean mask (True = keep).
+
+    "Voxels with a timeseries coefficient of variation 0.5 standard deviations higher than the mean coefficient of
+    variation of nearby voxels (within a 5 mm sigma Gaussian neighborhood) were excluded from the volume to surface sampling, as
+    described in (Glasser et al., 2013)." — Gordon 2017
+    
     """
     mean_ts = np.abs(data2d.mean(axis=0))
     mean_ts[mean_ts < 1e-6] = 1e-6      # avoid division by zero

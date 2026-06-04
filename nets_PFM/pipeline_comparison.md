@@ -8,7 +8,7 @@ in this project. Useful for interpreting any differences in results.
 
 ## Denoising
 
-| Parameter | Gordon 2017 (this pipeline) | Previous fsaverage5 pipeline |
+| Parameter | Gordon 2017 | Previous fsaverage5 pipeline |
 |---|---|---|
 | Motion model | Friston 1996 Volterra expansion | Ciric 2017 36-parameter model |
 | Motion regressors | 24: 6(t) + 6(t−1) + 6²(t) + 6²(t−1) | 24: 6 + 6-deriv + 6² + 6-deriv² |
@@ -17,9 +17,9 @@ in this project. Useful for interpreting any differences in results.
 | White matter | Yes (signal only) | Yes + derivative + power2 + deriv² |
 | CSF | Yes (signal only) | Yes + derivative + power2 + deriv² |
 | Total confound regressors | ~27 (24 motion + 3 physio) | 36 |
-| Scrubbing threshold | FD > 0.2 mm | FD > 0.2 mm |
+| Scrubbing threshold | FD > 0.2 mm | FD > 0.3 mm |
 | Scrubbing method | **Interpolate → filter → excise** (Power 2014) | Censor before filtering |
-| Bandpass | 0.009–0.08 Hz | 0.009–0.08 Hz |
+| Bandpass | 0.009–0.08 Hz | 0.01–0.08 Hz |
 | Pre-surface CoV masking | Yes (voxels > 0.5 SD above local mean excluded) | No |
 
 ### Notes on motion model differences
@@ -44,7 +44,7 @@ in this project. Useful for interpreting any differences in results.
 
 | Parameter | Gordon 2017 (this pipeline) | Previous fsaverage5 pipeline |
 |---|---|---|
-| Target surface space | **fsLR 32k** (32,492 vertices/hemi) | fsaverage5 (10,242 vertices/hemi) |
+| Target surface space | **fsLR 32k** (32,492 vertices/hemi) --> 0.025 to 0.035 square cm per vertex| fsaverage5 (10,242 vertices/hemi) |
 | Surface format | CIFTI `.dtseries.nii` | GIFTI `.func.gii` per hemisphere |
 | Subcortical included | Yes (voxel-level in CIFTI) | No |
 | Cerebellum included | Yes (voxel-level in CIFTI) | No |

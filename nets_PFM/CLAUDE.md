@@ -228,6 +228,24 @@ QC, or comparison with other datasets. Requires `--parc` at runtime.
   atlases/      reference atlases (gordon17, caNets_DDnr)
 ```
 
+## Analysis Notebooks
+
+### `npc_net_ana.ipynb` — NPC Network Sizes & DAN Patch Topology
+
+Two group-level analyses on completed PFM results (65 subjects, sub-05 excluded; DD = group 1, TD = group 0):
+
+**1. Network sizes within the NPC mask**
+- Restricts to a parietal NPC (numerosity processing cortex) ROI via `get_NPC_mask(space='fslr_den-32k', hemi='both')`.
+- Quantifies how much surface area each functional network occupies within the NPC mask per subject — three metrics: vertex count, template area, individual anatomy area (cm²).
+- Group comparison (uncorrected t-test + Bonferroni): **DAN significantly smaller in DD** (p_bonf = 0.043); **Visual2 significantly larger in DD** (p_bonf = 0.003).
+
+**2. DAN patch topology (spatially contiguous sub-regions)**
+- Decomposes each subject's DAN into spatially contiguous patches (connected components on the fsLR 32k surface graph).
+- Reference patch names derived from the group-average `caNets_DDnr` atlas: parietal-lateral, frontal-lateral, frontal-medial-dorsal, temporal, frontal-insula, frontal-medial patches in each hemisphere. Patches < 10 vertices in the atlas are excluded.
+- Each subject patch assigned to the nearest reference patch by centroid distance (Euclidean on midthickness coordinates).
+- Size metric: summed individual anatomy area (cm²) per reference patch per subject.
+- Main comparison: bilateral parietal DAN patch (L_parietal-lateral + R_parietal-lateral summed).
+
 ## Status
 
 - [x] Environment checked, paths confirmed
@@ -241,6 +259,7 @@ QC, or comparison with other datasets. Requires `--parc` at runtime.
 - [x] Tested end-to-end on sub-01
 - [x] Reference atlases in place (gordon17, caNets_DDnr) in fsLR 32k .npz format
 - [x] Pipeline running on all subjects (1–66) overnight
+- [x] `npc_net_ana.ipynb` — NPC network sizes + DAN patch topology, group comparisons (DD vs TD)
 
 ## References
 
