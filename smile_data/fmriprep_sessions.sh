@@ -27,21 +27,21 @@ read -r SUB SES < <(sed -n "${SLURM_ARRAY_TASK_ID}p" "$BATCH_FILE")
 
 echo "Processing sub-${SUB} ses-${SES}"
 
-module load singularityce
+module load apptainer
 export SINGULARITYENV_FS_LICENSE=$HOME/freesurfer/license.txt
 export SINGULARITYENV_TEMPLATEFLOW_HOME=/opt/templateflow
 
-singularity run -u \
+apptainer run -u \
     -B /shares/zne.uzh/$USER/ds-smile1:/data \
     -B /scratch/$USER/workflow_folders:/workflow \
     -B /scratch/$USER/templateflow:/opt/templateflow \
     --cleanenv \
-    /data/$USER/containers/fmriprep_20.2.3 \
+    /home/$USER/data/containers/fmriprep_20.2.3 \
     /data /data/derivatives \
     participant \
     --participant-label "$SUB" \
-    --session-label    "$SES" \
-    --output-spaces MNI152NLin2009cAsym T1w fsaverage5 fsnative \
+    --session-id    "$SES" \ # 
+    --output-spaces T1w fsaverage5 \
     --skip_bids_validation \
     --no-submm-recon \
     -w /workflow
