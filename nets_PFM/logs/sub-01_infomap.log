@@ -1,0 +1,37 @@
+[sub-01] Loading reference atlas: caNets_DDnr-magjudge-task-average-from-fsav5_space-fsLR_den-32k_cortex.npz
+  10 reference networks, 59412 nodes
+[sub-01] Running Infomap at density=0.003 ...
+  Graph: 59412 nodes, 5,329,647 edges
+  → 27 communities, 64.9% nodes assigned
+  → 7 reference networks assigned
+  Saved → sub-01_ses-1_space-fsLR32k_density-003_ref-caNets_DDnr_communities.npz  [3.4 min]
+[sub-01] Running Infomap at density=0.005 ...
+  Graph: 59412 nodes, 8,549,227 edges
+  → 27 communities, 74.9% nodes assigned
+  → 7 reference networks assigned
+  Saved → sub-01_ses-1_space-fsLR32k_density-005_ref-caNets_DDnr_communities.npz  [5.3 min]
+[sub-01] Running Infomap at density=0.010 ...
+  Graph: 59412 nodes, 17,944,355 edges
+  → 24 communities, 88.6% nodes assigned
+  → 7 reference networks assigned
+  Saved → sub-01_ses-1_space-fsLR32k_density-010_ref-caNets_DDnr_communities.npz  [11.8 min]
+[sub-01] Running Infomap at density=0.020 ...
+  Graph: 59412 nodes, 35,452,894 edges
+  → 20 communities, 96.6% nodes assigned
+  → 7 reference networks assigned
+  Saved → sub-01_ses-1_space-fsLR32k_density-020_ref-caNets_DDnr_communities.npz  [22.3 min]
+[sub-01] Running Infomap at density=0.030 ...
+  Graph: 59412 nodes, 53,192,897 edges
+  → 15 communities, 98.1% nodes assigned
+  → 6 reference networks assigned
+  Saved → sub-01_ses-1_space-fsLR32k_density-030_ref-caNets_DDnr_communities.npz  [35.4 min]
+[sub-01] Running Infomap at density=0.050 ...
+  Graph: 59412 nodes, 88,759,537 edges
+  → 11 communities, 99.4% nodes assigned
+  → 5 reference networks assigned
+  Saved → sub-01_ses-1_space-fsLR32k_density-050_ref-caNets_DDnr_communities.npz  [58.5 min]
+[sub-01] Computing consensus across 6 thresholds ...
+  → 21 consensus communities
+  Saved → sub-01_ses-1_space-fsLR32k_consensus_ref-caNets_DDnr_communities.npz
+
+[sub-01] Total time: 136.6 min

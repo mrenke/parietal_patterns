@@ -28,7 +28,7 @@ def main(sub, bids_folder,  sessions, tasks, ztransf=True):
         cm_notz = np.load(cm_fn)
 
         # Apply Fisher z-transform (arctanh) to normalize correlations
-        cm = np.arctanh(cm_notz) #needed to let it run on my own server # leave it in arctanh space
+        cm = np.arctanh(cm_notz) # leave it in arctanh space
 
         # Replace NaN and Inf values with 0
         cm[np.isnan(cm)] = 0

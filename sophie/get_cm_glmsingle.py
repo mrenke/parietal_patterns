@@ -34,7 +34,7 @@ def main(sub, bids_folder_input, bids_folder_output): #, stim
         hemi_combined = [None] * 2
         skip = False
         for i, hemi in enumerate(['L', 'R']):
-            filename = op.join(bids_folder_input, f'glm_stim{stim}.denoise', f'sub-{sub}', f'ses-{ses}', 'func', f'sub-{sub}_ses-1_task-magjudge_space-fsaverage5_stim-{stim}_hemi-{hemi}.func.gii') #{stim}     
+            filename = op.join(bids_folder_input, f'glm_stim.denoise.coOccCV', f'sub-{sub}', f'ses-{ses}', 'func', f'sub-{sub}_ses-1_task-magjudge_space-fsaverage5_stim-{stim}_hemi-{hemi}.func.gii') #{stim}     
             
             # Check if the file exists
             if not os.path.exists(filename):
@@ -76,8 +76,8 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('subject', default=None)
-    parser.add_argument('--bids_folder_input', default='/mnt_AdaBD_largefiles/Data/SMILE_DATA/DNumRisk/ds-dnumrisk/derivatives/')
-    parser.add_argument('--bids_folder_output', default='/mnt_AdaBD_largefiles/Data/SMILE_DATA/DNumRisk/ds-dnumrisk')
+    parser.add_argument('--bids_folder_input', default='/mnt_AdaBD_largefiles/Data/SMILE_DATA/DNumRisk/ds-numrisk/derivatives/')
+    parser.add_argument('--bids_folder_output', default='/mnt_AdaBD_largefiles/Data/SMILE_DATA/DNumRisk/ds-numrisk')
     #parser.add_argument('--stim', default=1)
 
     cmd_args = parser.parse_args()

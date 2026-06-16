@@ -8,6 +8,7 @@ from nilearn.glm.first_level import make_first_level_design_matrix
 import numpy as np
 import pandas as pd
 import nibabel as nib
+import matplotlib.pyplot as plt
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -18,11 +19,10 @@ warnings.filterwarnings('ignore')
 # rm -rf ~/.numba_cache
 # export NUMBA_DISABLE_JIT=1
 
-
 # check: https://github.com/cvnlab/GLMsingle/blob/main/glmsingle/glmsingle.py
 
 TR = 2.827 # that was wrong, and then design_matrix was weirdly of (but hard to figure out, random early volumes had multiple ones)
-stim_duration = 0.6 
+stim_duration = 0.6
 
 # open questions: 
 # "....specifying that a given condition occurs more than one time over the course of the experiment, this information can and will be used for cross-validation purposes."
@@ -122,7 +122,27 @@ def load_fmri_data(subject,bids_folder, space,session=1, task = 'magjudge', runs
             path = op.join(base, f'sub-{subject}_ses-{session}_task-{task}_run-{run}_space-{space}_desc-preproc_bold.nii.gz')
             data.append(nib.load(path).get_fdata())
     return data 
-##
+
+# buliding design matrix based on gilles code
+def build_design_matrix(events_run, n_vols, condition_to_idx):
+    """Return (dm, trial_order) for one run.
+
+    dm          : binary (n_vols × n_conditions) array, one 1 per row at the nearest TR
+    trial_order : condition labels in onset-time order — one entry per event,
+                  matching the order GLMsingle assigns single-trial betas
+    """
+    ev = events_run.reset_index().copy()
+    #ev['condition'] = ev.apply(make_condition_label, axis=1) # not needed because i do that in the code above
+    ev = ev.sort_values('onset')
+
+    dm = np.zeros((n_vols, len(condition_to_idx)))
+    trial_order = []
+    for _, row in ev.iterrows():
+        onset_tr = int(np.round(row['onset'] / TR))
+        col = condition_to_idx[row['trial_type']]
+        dm[min(onset_tr, n_vols - 1), col] = 1.0
+        trial_order.append(row['trial_type'])
+    return dm, trial_order
 
 
 def main(subject,  bids_folder, space,  runs = range(1, 7), session = 1, task='magjudge', coOccCV=True, perstim=True): #, smoothed=False,  retroicor=False, split_data = None): # 'both', 'run_123', 'run_456'
@@ -151,18 +171,19 @@ def main(subject,  bids_folder, space,  runs = range(1, 7), session = 1, task='m
         onsets = get_fmri_events_bothStim(subject, session, runs, bids_folder)
     tr = TR
     N_volumes = np.shape(im_data)[-1] # number of volumes
-    frametimes = np.linspace(tr/2., (N_volumes - .5)*tr, N_volumes)
-    onsets['onset'] = ((onsets['onset']+tr/2.) // tr) * tr
-    dm = [make_first_level_design_matrix(frametimes, onsets.loc[run], hrf_model='fir', oversampling=100.,
-                                         drift_order=0,
-                                         drift_model=None).drop('constant', axis=1) for run in runs]
-    dm = pd.concat(dm, keys=runs, names=['run']).fillna(0) # keys = range(1, 7)
-    dm.columns = [c.replace('_delay_0', '') for c in dm.columns]
-    dm /= dm.max()
-    dm[dm < 1.0] = 0.0
-    X = [dm.loc[run].values for run in runs]
+    
+    # build condition_to_idx from all unique conditions in the events
+    all_conditions = sorted(onsets['trial_type'].unique())
+    condition_to_idx = {c: i for i, c in enumerate(all_conditions)}
+    print(f'Conditions: {condition_to_idx}')
 
-    print(f'columns to check: {dm.columns.tolist()[:10]}')
+    X = []
+    trial_orders = []
+    for run in runs:
+        dm_run, trial_order = build_design_matrix(onsets.loc[run], N_volumes, condition_to_idx)
+
+        X.append(dm_run)
+        trial_orders.append(trial_order)
 
     print("Design matrix and data shapes:")
     print(np.shape(X))
