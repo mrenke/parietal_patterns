@@ -35,7 +35,7 @@ def main(sub, bids_folder,  sessions, tasks):
     mask, labeling_noParcel = get_basic_mask()
     mask[mask == True] = mask_cc # mark nodes not in component 0  as False in mask
     cm_filtered = cm[mask_cc, :][:, mask_cc]
-    print('connectivty matrix loaded and filtered with cc_mask')  
+    print('connectivty matrix loaded and filtered with cc_mask')
 
     # reference gradients (where grad-2 is anchored in visual2 !)
     ref_grad = '/mnt_AdaBD_largefiles/Data/SMILE_Data/DNumRisk/connectivity_references/dataset-dnumrisk_sub-All_gradients_kernel-normalized_angle_ztransf-True_avMethod-tanH.npy'

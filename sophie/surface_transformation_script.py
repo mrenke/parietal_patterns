@@ -35,7 +35,7 @@ def main(subject_id, session, stims, bids_folder):
 
     for stim in stimsList:
 
-        key = f'glm_stim.denoise'
+        key = f'glm_stim.denoise.coOccCV'
         target_dir = op.join('/mnt_AdaBD_largefiles/Data/SMILE_Data/DNumRisk/ds-numrisk/', 'derivatives', key , f'sub-{subject}', f'ses-{session}', 'func')
 
         surfinfo = sub.get_surf_info_fs()
@@ -76,5 +76,3 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     main(args.subject, args.session, args.stims,bids_folder=args.bids_folder) # ,denoise=args.denoise
-
-    

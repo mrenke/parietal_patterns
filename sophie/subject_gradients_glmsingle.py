@@ -12,7 +12,7 @@ import pandas as pd
 from scipy.sparse.csgraph import connected_components
 from my_utils import get_basic_mask, fit_correlation_matrix_unfiltered
 
-def main(sub, ses, bids_folder_cm, bids_folder_ref, specification, kernel_name, n_components=10):
+def main(sub, ses, bids_folder_cm, bids_folder_ref, specification, kernel_name, z_transf, n_components=10):
 
     if kernel_name == 'None':
         kernel = None
@@ -37,8 +37,21 @@ def main(sub, ses, bids_folder_cm, bids_folder_ref, specification, kernel_name, 
             print(f"Correlation matrix missing for sub-{sub}, stim {stim}. Skipping.")
             continue
 
-        cm = np.load(cm_file)
+        cm_notz = np.load(cm_file)
 
+        if z_transf:
+            # Apply Fisher z-transform (arctanh) to normalize correlations
+            cm = np.arctanh(cm_notz) # leave it in arctanh space
+
+            # Replace NaN and Inf values with 0
+            cm[np.isnan(cm)] = 0
+            cm[np.isinf(cm)] = 0
+        
+        else:
+            cm = cm_notz
+        
+        specif = f'z_transf-{z_transf}'
+        
         # filter out nodes that are not connected to the rest
         cc_mask_file = op.join(target_dir,f'sub-{sub}_cc-mask_space-fsaverag5_stim-{stim}_betas_kernel-{kernel_name}.npy')
         if (os.path.exists(cc_mask_file) == False):
@@ -65,17 +78,17 @@ def main(sub, ses, bids_folder_cm, bids_folder_ref, specification, kernel_name, 
         print(f'finished sub-{sub}: gradients generated')
         
         # save results
-        np.save(op.join(target_dir,f'sub-{sub}_lambdas_space-fsaverag5_n10{specification}_stimulus-{stim}_betas_kernel-{kernel_name}_av-aligned.npy'), gm.lambdas_) # save all together
+        np.save(op.join(target_dir,f'sub-{sub}_lambdas_space-fsaverag5_n10{specification}_stimulus-{stim}_betas_kernel-{kernel_name}{specif}.npy'), gm.lambdas_) # save all together
         gm_= gm.gradients_.T 
         grad = [None] * n_components
         for i, g in enumerate(gm_): # gm.gradients_.T
             grad[i] = map_to_labels(g, labeling_noParcel, mask=mask, fill=np.nan)
-        np.save(op.join(target_dir,f'sub-{sub}_gradients_space-fsaverag5_n10{specification}_stimulus-{stim}_betas_kernel-{kernel_name}_av-aligned.npy'), grad) # save all together
+        np.save(op.join(target_dir,f'sub-{sub}_gradients_space-fsaverag5_n10{specification}_stimulus-{stim}_betas_kernel-{kernel_name}{specif}.npy'), grad) # save all together
         gm_ = gm.aligned_.T
         grad = [None] * n_components
         for i, g in enumerate(gm_): # gm.gradients_.T
             grad[i] = map_to_labels(g, labeling_noParcel, mask=mask, fill=np.nan)
-        np.save(op.join(target_dir,f'sub-{sub}_g-aligned_space-fsaverag5_n10{specification}_stimulus-{stim}_betas_kernel-{kernel_name}_av-aligned.npy'), grad) # save all together    
+        np.save(op.join(target_dir,f'sub-{sub}_g-aligned_space-fsaverag5_n10{specification}_stimulus-{stim}_betas_kernel-{kernel_name}{specif}.npy'), grad) # save all together
 
 
 if __name__ == '__main__':
@@ -86,9 +99,10 @@ if __name__ == '__main__':
     parser.add_argument('--bids_folder_cm', default='/mnt_AdaBD_largefiles/Data/SMILE_DATA/DNumRisk/ds-dnumrisk')
     parser.add_argument('--bids_folder_ref', default='/mnt_AdaBD_largefiles/Data/DNumrisk_Data/connectivity_references') # /mnt_AdaBD_largefiles/Data/SMILE_DATA/DNumRisk/ds-dnumrisk
     parser.add_argument('--specification', default='')
+    parser.add_argument('--z_transf', action='store_true')
     parser.add_argument('--kernel_name', default='normalized_angle')
 
     cmd_args = parser.parse_args()
 
     main(cmd_args.subject, cmd_args.session, cmd_args.bids_folder_cm, cmd_args.bids_folder_ref,
-         cmd_args.specification, cmd_args.kernel_name)
+         cmd_args.specification, cmd_args.kernel_name, cmd_args.z_transf)

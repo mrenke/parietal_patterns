@@ -7,21 +7,23 @@ import numpy as np
 import nibabel as nib
 import pandas as pd
 from nilearn import signal
-from utils import get_basic_mask
+from my_utils import get_basic_mask
 from nilearn.connectome import ConnectivityMeasure
+from glob import glob
+
 
  # Current implementation:
  # 36P, scrubbing, frames_per_run_thresh, BP-filtering
-runs_per_sub_thresh = 2
+runs_per_sub_thresh = 1
 
-def cleanTS(sub, fmriprep_confounds_include, bids_folder, 
-        TR=2.3, ses =1, task ='magjudge',runs = range(1, 7),space = 'fsaverage5',
+def cleanTS(sub, fmriprep_confounds_include, bids_folder, sub_confounds,
+        TR=2.827, ses =1, task ='magjudge', runs = range(1, 7),space = 'fsaverage5', #TR=2.3 for dnum
         scrubbing=True, scrub_thresh= 0.3,
         run_FD_filter = True, frames_per_run_thresh=104,
-        bp_filtering=True, lower_bpf=0.01, upper_bpf=0.08): #  
+        bp_filtering=True, lower_bpf=0.01, upper_bpf=0.08):
 
     print(fmriprep_confounds_include)
-    fmriprep_folder = op.join(bids_folder,'derivatives', 'fmriprep', f'sub-{sub}', f'ses-{ses}', 'func') # f'ses-{ses}', 
+    fmriprep_folder = op.join(bids_folder,'derivatives', 'fmriprep', f'sub-{sub}', f'ses-{ses}', 'func')
 
     if space == 'fsaverage5':
         number_of_vertices = 20484 
@@ -42,8 +44,21 @@ def cleanTS(sub, fmriprep_confounds_include, bids_folder,
                 filename =  op.join(fmriprep_folder, f'sub-{sub}_ses-{ses}_task-{task}_run-{run}_space-{space}_hemi-{hemi}_bold.func.gii')   #_ses-{ses}
                 timeseries[i] = nib.load(filename).agg_data()        
             timeseries = np.vstack(timeseries) # (20484, N_timepoints)
+
             # load in and remove confounds
-            fmriprep_confounds_file = op.join(fmriprep_folder,f'sub-{sub}_ses-{ses}_task-{task}_run-{run}_desc-confounds_timeseries.tsv') # _ses-{ses} timeseries
+            # fmriprep_confounds_file = op.join(fmriprep_folder,f'sub-{sub}_ses-{ses}_task-{task}_run-{run}_desc-confounds_timeseries.tsv') # like this for dnumrisk
+            fmriprep_confounds_file = glob(op.join('/mnt_04/ds-numrisk/derivatives/fmriprep', f'sub-{sub_confounds}', 'func', f'sub-{sub_confounds}_task-numrisk_acq-*_run-{run}_desc-confounds_regressors.tsv'))
+            
+            ###
+            # only needed for numrisk data
+            if len(fmriprep_confounds_file) == 0:
+                print(f'No confounds file found for sub-{sub_confounds} run-{run}, skipping.')
+                continue
+            elif len(fmriprep_confounds_file) > 1:
+                print(f'Multiple confounds files found for sub-{sub_confounds} run-{run}: {fmriprep_confounds_file}, taking first.')
+            fmriprep_confounds_file = fmriprep_confounds_file[0]
+            ###
+
             fmriprep_confounds = pd.read_table(fmriprep_confounds_file)[fmriprep_confounds_include] 
             fmriprep_confounds= fmriprep_confounds.bfill()
 
@@ -81,11 +96,12 @@ def cleanTS(sub, fmriprep_confounds_include, bids_folder,
 
 cc_filter= False
 
-def main(sub, bids_folder_in, bids_folder_out,  confspec='32P', ses=1, task='magjudge',
+def main(sub, bids_folder_in, bids_folder_out,  confspec='36P', ses=1, task='magjudge',
         scrubbing=True, scrub_thresh=0.3, 
         run_FD_filter=True, frames_per_run_thresh=104,
         bp_filtering=True, lower_bpf=0.01, upper_bpf=0.08):  
 
+    sub_confounds = sub # only needed for numrisk
     sub = f'{int(sub):02d}'
 
     mov_params = ['trans_x','trans_y', 'trans_z', 'rot_x', 'rot_y', 'rot_z']
@@ -102,16 +118,16 @@ def main(sub, bids_folder_in, bids_folder_out,  confspec='32P', ses=1, task='mag
         fmriprep_confounds_include.append(param + '_derivative1_power2')
 
     clean_ts, N_valid_runs = cleanTS(sub,fmriprep_confounds_include=fmriprep_confounds_include, bids_folder=bids_folder_in, 
-                task=task, ses=ses, 
+                sub_confounds = sub_confounds, task=task, ses=ses, 
                 scrubbing=scrubbing,  scrub_thresh=scrub_thresh,
                 run_FD_filter=run_FD_filter, frames_per_run_thresh=frames_per_run_thresh,
-                bp_filtering=bp_filtering, lower_bpf=lower_bpf, upper_bpf=upper_bpf,
+                bp_filtering=bp_filtering, lower_bpf=lower_bpf, upper_bpf=upper_bpf
                 ) #, runs = range(1, 7)
 
     confspec += f'scrub{str(scrub_thresh)[2]}'  if scrubbing else confspec
     confspec += 'BPfilter' if bp_filtering else confspec
     confspec += f'runFD{str(frames_per_run_thresh)}' if run_FD_filter else confspec
-    confspec += f'-{N_valid_runs}runs' if run_FD_filter else confspec
+    confspec += f'-6runs' if run_FD_filter else confspec # {N_valid_runs}runs' if run_FD_filter else confspec
 
     mask, labeling_noParcel = get_basic_mask()
     seed_ts = clean_ts[mask]
@@ -119,7 +135,7 @@ def main(sub, bids_folder_in, bids_folder_out,  confspec='32P', ses=1, task='mag
     correlation_measure = ConnectivityMeasure(kind='correlation')
     cm = correlation_measure.fit_transform([seed_ts.T])[0] #correlation_matrix_noParcel
     fn = op.join(bids_folder_out, 'derivatives', 'correlation_matrices', f'sub-{sub}_ses-{ses}_task-{task}_confspec-{confspec}_CM-unfiltered.npy')
-    os.makedirs(op.dirname(fn), exist_ok=True)  # add this line before np.save
+    os.makedirs(op.dirname(fn), exist_ok=True)
     np.save(fn, cm)
     print(f'sub-{sub} ses-{ses} task-{task} conf-{confspec}: raw connectivity matrix estimated & saved to {fn}')    
 
@@ -127,9 +143,9 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('subject', default=None)
-    parser.add_argument('--bids_folder_input', default='/mnt_03/ds-dnumrisk')
-    parser.add_argument('--bids_folder_output', default='/mnt_AdaBD_largefiles/Data/SMILE_DATA/DNumRisk/ds-dnumrisk')
-    parser.add_argument('--confspec', default='36P')
+    parser.add_argument('--bids_folder_input', default='/mnt_AdaBD_largefiles/Data/SMILE_DATA/DNumRisk/ds-numrisk') #'/mnt_03/ds-dnumrisk'
+    parser.add_argument('--bids_folder_output', default='/mnt_AdaBD_largefiles/Data/SMILE_DATA/DNumRisk/ds-numrisk')
+    parser.add_argument('--confspec', default='36P') #32P
     parser.add_argument('--task', default='magjudge')
     parser.add_argument('--ses', default=1, type=int)
     cmd_args = parser.parse_args()
