@@ -1,22 +1,45 @@
 from pathlib import Path
+import re
 
 # --- Data paths ---
-BIDS_ROOT   = Path('/mnt_03/ds-dnumrisk')
+BIDS_ROOT   = Path('/mnt_asd/ds-asd')
 FMRIPREP    = BIDS_ROOT / 'derivatives' / 'fmriprep'
 FREESURFER  = BIDS_ROOT / 'derivatives' / 'freesurfer'
+# NOTE: as of 2026-06-27 no derivatives/freesurfer/ exists for this dataset.
+# Step 02 (fsnative -> fsLR32k resampling) needs sub-XX/surf/lh.sphere.reg
+# from FreeSurfer's recon-all output. The original (FreeSurfer 6.0.1, run
+# inside fMRIPrep on the cluster) is inaccessible during cluster maintenance.
 
-# Per-subject overrides for FREESURFER root / fMRIPrep anat surf dir — used
-# by config_asd.py for a local single-subject FreeSurfer test. Not needed here.
-FREESURFER_OVERRIDE = {}
-ANAT_DIR_OVERRIDE   = {}
+# --- Local single-subject FreeSurfer test (temporary, 2026-06-27) ---
+# recon-all run locally with FreeSurfer 7.3.2 on sub-01's raw T1w, since the
+# cluster's FreeSurfer 6.0.1 dir can't be copied over right now. A locally
+# regenerated sphere.reg would NOT have matching vertex topology with
+# fMRIPrep's already-exported anat/*.surf.gii (different FreeSurfer version,
+# and recon-all's topology-fixing isn't guaranteed reproducible run-to-run
+# anyway) — so for this test subject ALL native surfaces (smoothwm, pial,
+# midthickness, sphere.reg) are derived from the one local recon-all run,
+# overriding fMRIPrep's anat outputs, to keep mesh topology self-consistent.
+# Remove these overrides once the real cluster FreeSurfer dirs are copied in.
+_LOCAL_TEST_ROOT = Path('/mnt_AdaBD_largefiles/Data/DNumRisk_Data/ds-asd'
+                         '/derivatives/freesurfer_local_test_fs7.3.2')
+FREESURFER_OVERRIDE = {
+    'sub-01': _LOCAL_TEST_ROOT,
+}
+ANAT_DIR_OVERRIDE = {
+    'sub-01': _LOCAL_TEST_ROOT / 'sub-01' / 'anat_gii',
+}
 
-# Output root — change BIDS_ROOT_OUT if the input volume runs low on disk.
-# Folder structure mirrors the input BIDS tree (derivatives/pfm_fslr/sub-XX/...).
-BIDS_ROOT_OUT = BIDS_ROOT   # e.g. Path('/mnt_04/ds-dnumrisk') if redirecting
-OUTPUT_ROOT   = BIDS_ROOT_OUT / 'derivatives' / 'pfm_fslr'
-ATLAS_DIR     = OUTPUT_ROOT / 'atlases'
+# /mnt_asd is nearly full (~28 GB free) — redirect pfm_fslr outputs to the
+# largefiles mount instead of writing next to the input data.
+OUTPUT_ROOT = Path('/mnt_AdaBD_largefiles/Data/DNumRisk_Data/ds-asd'
+                    '/derivatives/pfm_fslr')
 
-PLOT_DIR = Path('/mnt_AdaBD_largefiles/Data/SMILE_Data/DNumRisk/ds-dnumrisk'
+# Reference atlases (gordon17, caNets_DDnr) are dataset-independent labelling
+# references already in fsLR 32k space — reuse DNumRisk's copy rather than
+# duplicating them here.
+ATLAS_DIR = Path('/mnt_03/ds-dnumrisk/derivatives/pfm_fslr/atlases')
+
+PLOT_DIR = Path('/mnt_AdaBD_largefiles/Data/DNumRisk_Data/ds-asd'
                  '/plots_and_ims/nets_PFM')
 
 # --- Tools ---
@@ -28,52 +51,57 @@ HCP_ATLASES  = Path('/home/ubuntu/git/HCPpipelines/global/templates/standard_mes
 HCP_RESAMPLE = HCP_ATLASES / 'resample_fsaverage'
 NEUROMAPS_FSLR = Path('/home/ubuntu/neuromaps-data/atlases/fsLR')
 
-# fsLR 32k target sphere (expressed in fsaverage coordinates)
 FSLR_SPHERE = {
     'L': HCP_RESAMPLE / 'fs_LR-deformed_to-fsaverage.L.sphere.32k_fs_LR.surf.gii',
     'R': HCP_RESAMPLE / 'fs_LR-deformed_to-fsaverage.R.sphere.32k_fs_LR.surf.gii',
 }
-# fsLR 32k template midthickness (for area correction in resampling)
 FSLR_MIDTHICK = {
     'L': NEUROMAPS_FSLR / 'tpl-fsLR_den-32k_hemi-L_midthickness.surf.gii',
     'R': NEUROMAPS_FSLR / 'tpl-fsLR_den-32k_hemi-R_midthickness.surf.gii',
 }
-# Medial wall ROI masks — used to exclude non-cortical vertices from CIFTI
 FSLR_ROI = {
     'L': HCP_ATLASES / 'L.atlasroi.32k_fs_LR.shape.gii',
     'R': HCP_ATLASES / 'R.atlasroi.32k_fs_LR.shape.gii',
 }
 
 # --- Vertex-wise CM / Infomap ---
-# Density thresholds: fraction of ALL n*(n-1)/2 pairs kept as edges
 INFOMAP_DENSITIES = [0.003, 0.005, 0.01, 0.02, 0.03, 0.05]
-CM_CHUNK_SIZE     = 200    # nodes per chunk during correlation computation
-CM_DIST_CUTOFF_MM = 30.0   # local connections zeroed within this distance
+CM_CHUNK_SIZE     = 200
+CM_DIST_CUTOFF_MM = 30.0
 
 # --- Acquisition parameters ---
 SESSION = 'ses-1'
-TASK    = 'magjudge'
-TR      = 2.298   # seconds
+TASK    = 'chase'
+TR      = 2.3338   # seconds
 
-ALL_SUBJECTS = list(range(1, 67))
+ALL_SUBJECTS = list(range(1, 99))
 
 
 def get_runs(subject: str) -> list[int]:
-    """Run numbers for a subject. Fixed at 6 for all DNumRisk subjects."""
-    return list(range(1, 7))
+    """Run numbers for a subject, detected from confounds files.
+
+    Run count is NOT constant across ds-asd subjects (most have 9 runs of
+    task-chase, a handful have 6) — unlike DNumRisk, this can't be a fixed list.
+    """
+    func_dir = FMRIPREP / subject / SESSION / 'func'
+    pattern  = re.compile(rf'{subject}_{SESSION}_task-{TASK}_run-(\d+)_desc-confounds_timeseries\.tsv')
+    runs = sorted(
+        int(m.group(1)) for f in func_dir.glob(f'*_task-{TASK}_run-*_desc-confounds_timeseries.tsv')
+        if (m := pattern.match(f.name))
+    )
+    return runs
 
 
 # --- Denoising parameters (Gordon 2017) ---
-FD_THRESHOLD = 0.2   # mm — frames above this are censored
-BP_LOW       = 0.009  # Hz
-BP_HIGH      = 0.08   # Hz
-COV_SD_THRESH = 0.5   # SDs above local mean CoV → voxel excluded
+FD_THRESHOLD = 0.2
+BP_LOW       = 0.009
+BP_HIGH      = 0.08
+COV_SD_THRESH = 0.5
 
 # --- Smoothing ---
-SMOOTH_SIGMA = 2.55   # mm (geodesic on surface, Euclidean on volume)
+SMOOTH_SIGMA = 2.55
 
 # --- Network label names by reference atlas ---
-# Used in analysis notebooks; kept here so all scripts share one source of truth.
 ATLAS_NETWORK_NAMES = {
     'gordon17': {
         0:  'Unassigned',
@@ -113,7 +141,6 @@ ATLAS_NETWORK_NAMES = {
 }
 
 # --- Subcortical structures: aparc+aseg label → (cifti_int, CIFTI_structure_name)
-# Cerebellar cortex only (8=L, 47=R). WM (7, 46) excluded for simplicity.
 SUBCORTICAL_LABELS = {
     10: (1,  'CIFTI_STRUCTURE_THALAMUS_LEFT'),
     11: (2,  'CIFTI_STRUCTURE_CAUDATE_LEFT'),

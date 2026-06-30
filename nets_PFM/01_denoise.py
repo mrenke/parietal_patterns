@@ -20,7 +20,7 @@ from scipy.ndimage import gaussian_filter
 from scipy.signal import butter, filtfilt
 
 sys.path.insert(0, str(Path(__file__).parent))
-from config import (FMRIPREP, OUTPUT_ROOT, SESSION, TASK, RUNS, TR,
+from config import (FMRIPREP, OUTPUT_ROOT, SESSION, TASK, TR, get_runs,
                     FD_THRESHOLD, BP_LOW, BP_HIGH, COV_SD_THRESH)
 
 
@@ -206,7 +206,7 @@ def main(subject: str) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     skipped = []
-    for run in RUNS:
+    for run in get_runs(subject):
         func_dir  = FMRIPREP / subject / SESSION / 'func'
         stem      = f'{subject}_{SESSION}_task-{TASK}_run-{run}'
         bold_path = func_dir / f'{stem}_space-T1w_desc-preproc_bold.nii.gz'
