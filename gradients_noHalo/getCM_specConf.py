@@ -118,7 +118,8 @@ def main(sub, bids_folder_in, bids_folder_out,  confspec='32P', ses=1, task='mag
 
     correlation_measure = ConnectivityMeasure(kind='correlation')
     cm = correlation_measure.fit_transform([seed_ts.T])[0] #correlation_matrix_noParcel
-    fn = op.join(bids_folder_out, 'derivatives', 'correlation_matrices.tryNoHalo', f'sub-{sub}_ses-{ses}_task-{task}_confspec-{confspec}_CM-unfiltered.npy')
+    fn = op.join(bids_folder_out, 'derivatives', 'correlation_matrices', f'sub-{sub}_ses-{ses}_task-{task}_confspec-{confspec}_CM-unfiltered.npy')
+    os.makedirs(op.dirname(fn), exist_ok=True)  # add this line before np.save
     np.save(fn, cm)
     print(f'sub-{sub} ses-{ses} task-{task} conf-{confspec}: raw connectivity matrix estimated & saved to {fn}')    
 
@@ -128,7 +129,7 @@ if __name__ == '__main__':
     parser.add_argument('subject', default=None)
     parser.add_argument('--bids_folder_input', default='/mnt_03/ds-dnumrisk')
     parser.add_argument('--bids_folder_output', default='/mnt_AdaBD_largefiles/Data/SMILE_DATA/DNumRisk/ds-dnumrisk')
-    parser.add_argument('--confspec', default='32P')
+    parser.add_argument('--confspec', default='36P')
     parser.add_argument('--task', default='magjudge')
     parser.add_argument('--ses', default=1, type=int)
     cmd_args = parser.parse_args()

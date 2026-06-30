@@ -35,3 +35,9 @@ If strict volumetric T1w compatibility were ever needed, the options are: (a) re
 - `prepare_data.py` is the active conversion script; run it whenever new data arrives. Check `bids_conversion_log.csv` to see which batches have been processed.
 - Sophie did multi-task analysis with the dataset status ~ November 2025.
 - Maike: Part of the dyscalculia datapool comparison (`dyscalculia_datapool_ana/`).
+- for fmriprep: sciencecluster updates: new software (apptainer instead of singularity), change folder structure (/home/$USER and /data/$USER are merged into single workspace. /data/$USER is now /home/$USER/data)
+ ---> change to newest fmriprep: 'APPTAINER_BINDPATH="" apptainer build /home/$USER/data/containers/fmriprep_25.2.5.sif docker://nipreps/fmriprep:25.2.5'
+
+ 
+
+
