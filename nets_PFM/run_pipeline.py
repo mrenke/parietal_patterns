@@ -13,13 +13,16 @@ Steps:
   04b relabel with caNets_DDnr reference
 
 Usage:
-  python run_pipeline.py                    # all subjects 1-66
+  python run_pipeline.py                    # all subjects, default dataset
+  python run_pipeline.py --dataset asd       # run against ds-asd instead
   python run_pipeline.py --subjects 1 2 3
   python run_pipeline.py --start 10         # resume from subject 10
   python run_pipeline.py --steps 03 04 04b  # run only specific steps
 """
 import argparse
+import os
 import subprocess
+import sys
 import time
 import numpy as np
 import pandas as pd
@@ -31,24 +34,26 @@ from datetime import datetime
 # ---------------------------------------------------------------------------
 SCRIPT_DIR  = Path(__file__).parent
 LOG_DIR     = SCRIPT_DIR / 'logs'
-ATLAS_DIR   = Path('/mnt_03/ds-dnumrisk/derivatives/pfm_fslr/atlases')
-OUTPUT_ROOT = Path('/mnt_03/ds-dnumrisk/derivatives/pfm_fslr')
+
+sys.path.insert(0, str(SCRIPT_DIR))
+
+# --dataset selects config_<dataset>.py via config.py; must be resolved
+# before importing config since it reads PFM_DATASET at import time.
+_pre = argparse.ArgumentParser(add_help=False)
+_pre.add_argument('--dataset', default=os.environ.get('PFM_DATASET', 'dnumrisk'))
+_pre_args, _ = _pre.parse_known_args()
+os.environ['PFM_DATASET'] = _pre_args.dataset
+
+from config import (ATLAS_DIR, OUTPUT_ROOT, PLOT_DIR, SESSION, TASK,
+                     ALL_SUBJECTS, get_runs)
 
 REF_GORDON = ATLAS_DIR / 'gordon17_space-fsLR_den-32k_cortex.npz'
 REF_CANETS = ATLAS_DIR / 'caNets_DDnr-magjudge-task-average-from-fsav5_space-fsLR_den-32k_cortex.npz'
 
-PLOT_DIR    = Path('/mnt_AdaBD_largefiles/Data/SMILE_Data/DNumRisk/ds-dnumrisk'
-                   '/plots_and_ims/nets_PFM')
-
 CONDA_ENV   = 'numrefields'
 PYTHON      = ['conda', 'run', '--no-capture-output', '-n', CONDA_ENV, 'python', '-u']
 
-ALL_SUBJECTS = list(range(1, 67))
 ALL_STEPS    = ['01', '02', '03', '04', '04b', '05', '06']
-
-SESSION = 'ses-1'
-TASK    = 'magjudge'
-RUNS    = list(range(1, 7))
 
 
 # ---------------------------------------------------------------------------
@@ -91,7 +96,7 @@ def get_frame_counts(subject: str) -> dict:
     den_dir = OUTPUT_ROOT / subject / 'denoised'
     total = retained = 0
     found = 0
-    for run in RUNS:
+    for run in get_runs(subject):
         stem = f'{subject}_{SESSION}_task-{TASK}_run-{run}'
         mask_path = den_dir / f'{stem}_desc-scrubmask.npy'
         if mask_path.exists():
@@ -120,7 +125,7 @@ def is_done(subject: str, step: str) -> bool:
         '01':  all(
             (sub_dir / 'denoised' /
              f'{subject}_{SESSION}_task-{TASK}_run-{r}_desc-scrubmask.npy').exists()
-            for r in RUNS
+            for r in get_runs(subject)
         ) or (sub_dir / 'cifti' / f'{stem}_bold_concat.dtseries.nii').exists(),
         '02':  (sub_dir / 'cifti' /
                 f'{stem}_bold_concat.dtseries.nii').exists(),
@@ -279,8 +284,10 @@ def main(subjects: list[int], steps: list[str], force: bool = False) -> None:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+    parser.add_argument('--dataset', default=_pre_args.dataset,
+                        help="Dataset config to use, e.g. 'dnumrisk' (default) or 'asd'")
     parser.add_argument('--subjects', nargs='+', type=int, default=None,
-                        help='Subject numbers to run (default: 1-66)')
+                        help='Subject numbers to run (default: all subjects in dataset)')
     parser.add_argument('--start', type=int, default=None,
                         help='Resume from this subject number')
     parser.add_argument('--steps', nargs='+', default=ALL_STEPS,

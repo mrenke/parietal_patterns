@@ -14,6 +14,35 @@ Generate individual-specific functional connectomes (parcel-to-parcel correlatio
 - **Task:** task-magjudge, 6 runs per subject
 - **BOLD:** 188 volumes, TR = 2.298 s, voxels = 2.5 × 2.5 × 3.0 mm, space = T1w (59 × 71 × 49)
 
+## Multi-dataset config
+
+All scripts do `from config import X`. `config.py` is a thin loader that re-exports
+`config_<dataset>.py` based on the `PFM_DATASET` env var (default `dnumrisk`):
+```bash
+python 01_denoise.py sub-01                  # dnumrisk (default)
+PFM_DATASET=asd python 01_denoise.py sub-01  # ds-asd
+python run_pipeline.py --dataset asd         # run_pipeline.py also takes --dataset
+```
+Each `config_<dataset>.py` defines the same fields (`BIDS_ROOT`, `OUTPUT_ROOT`,
+`ATLAS_DIR`, `PLOT_DIR`, `SESSION`, `TASK`, `TR`, `ALL_SUBJECTS`, plus a
+`get_runs(subject)` function — run counts aren't assumed fixed across subjects).
+
+### ds-asd (`config_asd.py`)
+- **BIDS root:** `/mnt_asd/ds-asd`, 98 subjects, ses-1 only, task-chase
+- **Run count varies per subject** (93 subjects have 9 runs, 5 have 6) — `get_runs()`
+  detects this by globbing confounds files rather than using a fixed list.
+- **Output redirected** to `/mnt_AdaBD_largefiles/Data/DNumRisk_Data/ds-asd/derivatives/pfm_fslr`
+  — `/mnt_asd` only has ~28 GB free, not enough for PFM derivatives across 98 subjects.
+- **Reference atlases reused** from DNumRisk's `pfm_fslr/atlases/` (gordon17,
+  caNets_DDnr) — these are dataset-independent labelling references, not duplicated.
+- **BLOCKER:** no `derivatives/freesurfer/` found anywhere for this dataset (checked
+  `/mnt_asd/ds-asd` and the `/mnt_AdaBD_largefiles` mirror). Step 02 needs
+  `sub-XX/surf/lh.sphere.reg.surf.gii` from FreeSurfer's recon-all output for the
+  fsnative→fsaverage→fsLR32k resampling. fMRIPrep (v20.2.3) clearly ran recon-all
+  internally (fsaverage5/fsnative surfaces exist in its output), but the FreeSurfer
+  SUBJECTS_DIR itself wasn't kept/exposed. Must be located or regenerated before
+  step 02 can run on this dataset.
+
 ## Key File Paths
 
 ### Per-run inputs (replace `sub-XX` and `run-N`)

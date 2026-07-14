@@ -27,9 +27,10 @@ import pandas as pd
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from config import (FMRIPREP, FREESURFER, OUTPUT_ROOT, SESSION, TASK, RUNS,
+from config import (FMRIPREP, FREESURFER, OUTPUT_ROOT, SESSION, TASK, get_runs,
                     TR, SMOOTH_SIGMA, WB_COMMAND, MRIS_CONVERT,
-                    FSLR_SPHERE, FSLR_MIDTHICK, FSLR_ROI, SUBCORTICAL_LABELS)
+                    FSLR_SPHERE, FSLR_MIDTHICK, FSLR_ROI, SUBCORTICAL_LABELS,
+                    FREESURFER_OVERRIDE, ANAT_DIR_OVERRIDE)
 
 
 # ---------------------------------------------------------------------------
@@ -128,7 +129,7 @@ def process_run(subject: str, run: int, surf_dir: Path,
     Returns path to smoothed per-run CIFTI.
     """
     func_dir    = FMRIPREP / subject / SESSION / 'func'
-    fs_surf_dir = FREESURFER / subject / 'surf'
+    fs_surf_dir = FREESURFER_OVERRIDE.get(subject, FREESURFER) / subject / 'surf'
     stem = f'{subject}_{SESSION}_task-{TASK}_run-{run}'
 
     denoised_path = OUTPUT_ROOT / subject / 'denoised' / \
@@ -192,7 +193,7 @@ def process_run(subject: str, run: int, surf_dir: Path,
 # ---------------------------------------------------------------------------
 
 def main(subject: str) -> None:
-    surf_dir = FMRIPREP / subject / SESSION / 'anat'
+    surf_dir = ANAT_DIR_OVERRIDE.get(subject, FMRIPREP / subject / SESSION / 'anat')
     out_dir  = OUTPUT_ROOT / subject / 'cifti'
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -205,7 +206,7 @@ def main(subject: str) -> None:
 
     skipped = []
     run_ciftis = []
-    for run in RUNS:
+    for run in get_runs(subject):
         denoised_path = (OUTPUT_ROOT / subject / 'denoised' /
                          f'{subject}_{SESSION}_task-{TASK}_run-{run}_desc-denoised_bold.nii.gz')
         if not denoised_path.exists():
