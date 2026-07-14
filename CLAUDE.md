@@ -31,6 +31,7 @@ See `DATA_OVERVIEW.md` for a full audit of derivative folders on the data server
 | Folder | Dataset(s) | Method | Notes |
 |--------|-----------|--------|-------|
 | `nets_PFM/` | DNumRisk | Precision functional mapping (Gordon 2017, fsLR 32k, Infomap) + group-level NPC/DAN-patch analysis | Pipeline complete (65 subjects); NPC network sizes and DAN patch topology compared DD vs TD — **see `nets_PFM/CLAUDE.md`** |
+| `asd_pfm_ana/` | ASD (`ds-asd`) | PFM (fsLR 32k, Infomap), parietal DAN-patch comparison | 🟡 Planned — sibling to `charles_01/`; testing whether the DD-vs-TD parietal DAN-patch finding from `nets_PFM/` replicates in this cohort — **see `asd_pfm_ana/CLAUDE.md`** |
 
 ### 🔵 ANALYSIS COMPLETE (archived or pending group-level work)
 

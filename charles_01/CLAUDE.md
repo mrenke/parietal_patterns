@@ -2,6 +2,8 @@
 
 Status: **ARCHIVED** — collaboration with Charles on BIDS reorganization and early gradient fitting.
 
+**Continued work:** Charles (master student) took this further into his own repo: [fMRI-autism-analysis](https://github.com/charles-neuro/fMRI-autism-analysis/tree/main). Check there for any analysis beyond what's archived here.
+
 ## What this was
 BIDS data reorganization (including fieldmap setup for fMRIPrep) and early exploration of gradient fitting methods, predating the main `gradient_analysis/` pipeline.
 
