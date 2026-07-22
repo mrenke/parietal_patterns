@@ -173,9 +173,21 @@ All-to-all cross-correlation of CIFTI timeseries (cortical vertices + subcortica
 The full ~90k × 90k dense matrix is never materialised — computed in row-chunks of 200 nodes.
 
 - **30 mm proximity zeroing:** same-hemisphere surface pairs within 30 mm set to 0.
-  Distance approximated as Euclidean on midthickness coordinates (conservative:
-  Euclidean ≤ geodesic, so slightly fewer pairs are zeroed than with true geodesic).
-  Inter-hemispheric and subcortical pairs are retained regardless of distance.
+  Distance approximated as Euclidean on midthickness coordinates rather than true
+  surface geodesic distance. Inter-hemispheric and subcortical pairs are retained
+  regardless of distance.
+  - **Deviation from Gordon et al. 2017:** Gordon et al. use true geodesic distance
+    for within-hemisphere surface pairs and a Euclidean-distance criterion for
+    subcortical pairs. Our implementation deviates on both counts: (1) surface pairs
+    use Euclidean instead of geodesic distance — since Euclidean ≤ geodesic on a
+    folded surface, this zeroes a *superset* of what a true geodesic 30mm criterion
+    would (e.g. vertices on opposite banks of a sulcus can be <30mm apart in a
+    straight line despite a much longer cortical path), i.e. it is if anything
+    slightly more conservative, not less (the code comment previously claimed the
+    opposite — that was wrong and has been corrected here); (2) no proximity
+    exclusion at all is applied to subcortical/cerebellar pairs (Gordon et al. do
+    apply one). Not expected to materially affect DAN/NPC parietal results, but
+    worth a limitations note if these deviations matter for a given analysis.
 - **Threshold estimation:** random sample of 100k pairs → empirical r-value distribution
   → compute r_cutoff for each target density.
 - **Target densities:** 0.3%, 0.5%, 1%, 2%, 3%, 5%  (fraction of all n*(n-1)/2 pairs kept)
@@ -274,6 +286,7 @@ Two group-level analyses on completed PFM results (65 subjects, sub-05 excluded;
 - Each subject patch assigned to the nearest reference patch by centroid distance (Euclidean on midthickness coordinates).
 - Size metric: summed individual anatomy area (cm²) per reference patch per subject.
 - Main comparison: bilateral parietal DAN patch (L_parietal-lateral + R_parietal-lateral summed).
+- Paper-ready methods writeup (whole PFM pipeline, incl. this section): `PFM_methods.md`.
 
 ## Status
 

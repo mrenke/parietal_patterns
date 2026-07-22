@@ -3,13 +3,15 @@
 Step 3 — Vertex-wise correlation matrix (Gordon 2017 protocol).
 
 Computes the all-to-all cross-correlation matrix of the CIFTI timeseries
-(cortical surface vertices + subcortical voxels), following Gordon 2017:
-  - Correlations between nodes within 30 mm (same-hemisphere surface, or
-    any pair involving subcortical) are set to zero.
-  - For within-hemisphere surface connections, distance is approximated
-    as Euclidean between midthickness coordinates (true geodesic would
-    require a much more expensive computation; the approximation is
-    conservative: Euclidean ≤ geodesic, so we zero slightly fewer pairs).
+(cortical surface vertices + subcortical voxels), loosely following Gordon 2017,
+with two known deviations from that protocol (see nets_PFM/CLAUDE.md):
+  - Correlations between same-hemisphere surface nodes within 30 mm are set to
+    zero. Distance is approximated as Euclidean between midthickness coordinates
+    rather than true geodesic (geodesic would require a much more expensive
+    computation). Since Euclidean <= geodesic on a folded surface, this zeroes a
+    *superset* of what a true geodesic criterion would zero, not a subset.
+  - Pairs involving subcortical voxels are NOT zeroed regardless of distance
+    (Gordon et al. 2017 apply a Euclidean-distance criterion here; we don't).
   - The matrix is thresholded at each target density and saved as a
     scipy sparse matrix (.npz), one file per density threshold.
 
