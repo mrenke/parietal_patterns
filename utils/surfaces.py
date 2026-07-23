@@ -48,6 +48,51 @@ def build_adj_and_coords(surf_path):
     adj = csr_matrix((np.ones(len(i)), (i, j)), shape=(n, n))
     return adj, coords
 
+def load_gifti_mesh(surf_path):
+    """Load a GIFTI surface (.surf.gii) as a pyvista PolyData mesh."""
+    import pyvista as pv
+
+    surf = nib.load(surf_path)
+    coords = surf.darrays[0].data
+    faces = surf.darrays[1].data
+    faces_padded = np.hstack(
+        [np.full((faces.shape[0], 1), 3, dtype=np.int64), faces.astype(np.int64)]
+    )
+    return pv.PolyData(coords, faces_padded)
+
+
+def plot_surf_patch_pyvista(surf_path, surf_map, vmin, vmax, cmap='viridis',
+                             azimuth=0, elevation=0, roll=None, title=None,
+                             window_size=(800, 800), screenshot=None):
+    """Render only the finite-valued patch of a surface map (true sub-mesh, not just
+    greyed-out background) with an arbitrary camera angle, via pyvista.
+
+    `surf_map` holds one scalar per mesh vertex, in vertex order; NaN entries are
+    excluded from the mesh entirely (same convention as the surf_map_hemi arrays
+    already built for nplt.plot_surf elsewhere in this notebook). Requires an X
+    server (real or Xvfb) — set the DISPLAY env var before calling.
+    """
+    import pyvista as pv
+
+    mesh = load_gifti_mesh(surf_path)
+    mask = np.isfinite(surf_map)
+    mesh['value'] = surf_map
+    patch = mesh.extract_points(mask, adjacent_cells=True)
+
+    plotter = pv.Plotter(off_screen=True, window_size=window_size)
+    plotter.add_mesh(patch, scalars='value', cmap=cmap, clim=(vmin, vmax),
+                      show_scalar_bar=True, scalar_bar_args={'title': title or ''})
+    plotter.background_color = 'white'
+    plotter.reset_camera()
+    plotter.camera.azimuth = azimuth
+    plotter.camera.elevation = elevation
+    if roll is not None:
+        plotter.camera.roll = roll
+    img = plotter.screenshot(screenshot, return_img=True)
+    plotter.close()
+    return img
+
+
 def centroid_to_lobe(centroid):
     """Approximate anatomical lobe label from patch centroid (fsLR MNI-like coords)."""
     x, y, z = centroid
