@@ -1,5 +1,6 @@
 from scipy.stats import normaltest, ttest_ind, mannwhitneyu, ttest_rel
 import numpy as np
+import pandas as pd
 
 def between_group_comparison(df_tmp, y_var, alpha=0.05, group_names = ['Control','Dyscalculic']):
     pval_normal = normaltest(df_tmp[y_var]).pvalue
@@ -35,3 +36,14 @@ def get_pval_colormap():
         cols = np.vstack((colors2,colors3))
         mymap = colors.LinearSegmentedColormap.from_list('my_colormap', cols[::-1])
         return mymap
+
+def sig_stars(p):
+    if pd.isna(p):
+        return ''
+    elif p < 0.001:
+        return '***'
+    elif p < 0.01:
+        return '**'
+    elif p < 0.05:
+        return '*'
+    return ''
