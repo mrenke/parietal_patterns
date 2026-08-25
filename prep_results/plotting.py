@@ -65,6 +65,17 @@ def set_style():
     sns.set_context('paper')
 
 
+def format_pvalue(p, prefix='p'):
+    """'p < 0.001' below the reporting floor, otherwise 'p = 0.036'.
+
+    Used for both frequentist p-values and Bayesian posterior tail probabilities
+    (pass prefix='p_bayes' for the latter). A tail probability of exactly 0 just
+    means no posterior draw fell on that side, so it must never be printed as
+    'p = 0.000' -- the floor is what the draw count can actually resolve.
+    """
+    return f'{prefix} < 0.001' if p < 0.001 else f'{prefix} = {p:.3f}'
+
+
 def render_surf_panel(surf_mesh, bg_map, surf_map_hemi, view, cmap, vmin, vmax,
                        hemi='left', avg_method='median', darkness=0.3):
     """Render one inflated-surface panel to a whitespace-cropped PIL image.
@@ -104,6 +115,17 @@ def add_panel_letter(ax, letter, dx=-0.15, dy=1.05, fontsize=12):
             fontweight='bold', va='bottom', ha='right')
 
 
+def add_panel_letter_fig(fig, letter, x, y, fontsize=12):
+    """Panel letter placed in *figure* coordinates, for a shared letter baseline.
+
+    add_panel_letter() offsets from an axes, which drifts as soon as the panels it
+    labels differ in size, aspect, or how far their tick/axis labels stick out -- the
+    letters then land at visibly different heights. Pass figure coordinates (e.g. from
+    a GridSpec cell's get_position(fig)) when several letters must line up.
+    """
+    fig.text(x, y, letter, fontsize=fontsize, fontweight='bold', va='bottom', ha='left')
+
+
 def add_subpanel_label(ax, label, dx=-0.15, dy=1.05, fontsize=9):
     """Small italic sub-panel index (i, ii, iii, ...) for panels grouped under one main letter."""
     ax.text(dx, dy, label, transform=ax.transAxes, fontsize=fontsize,
@@ -137,9 +159,8 @@ def plot_group_comparison_panel(ax, df_plot, measure, ylabel, stat,
     ax.plot([0, 0, 1, 1], [bracket_y - leg, bracket_y, bracket_y, bracket_y - leg],
             lw=0.8, color='0.15')
 
-    p = stat.pvalue
-    p_txt = 'p < 0.001' if p < 0.001 else f'p = {p:.3f}'
-    ax.text(0.5, bracket_y, p_txt, ha='center', va='bottom', fontsize=7, color='0.15')
+    ax.text(0.5, bracket_y, format_pvalue(stat.pvalue), ha='center', va='bottom',
+            fontsize=7, color='0.15')
 
     ax.set_ylim(top=bracket_y + 0.18 * y_span)
     if ymin is not None:
