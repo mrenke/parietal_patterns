@@ -76,6 +76,25 @@ def format_pvalue(p, prefix='p'):
     return f'{prefix} < 0.001' if p < 0.001 else f'{prefix} = {p:.3f}'
 
 
+
+def wrap_label(name):
+    """Break a measure label onto two lines at its natural point, to save horizontal space.
+
+    Long row labels on a correlation matrix set the width of the whole left margin, which
+    is exactly the space a wide figure needs for its other panels. The break points are the
+    two the labels already carry: after a family prefix ('PMC-RDM: ...', 'nPRF: ...') or
+    before a parenthetical qualifier ('... (Corsi span)'). A label with neither is returned
+    unchanged, so this is safe to map over a whole dict of names.
+    """
+    if ': ' in name:
+        head, tail = name.split(': ', 1)
+        return f'{head}:\n{tail}'
+    if ' (' in name:
+        head, tail = name.split(' (', 1)
+        return f'{head}\n({tail}'
+    return name
+
+
 def render_surf_panel(surf_mesh, bg_map, surf_map_hemi, view, cmap, vmin, vmax,
                        hemi='left', avg_method='median', darkness=0.3):
     """Render one inflated-surface panel to a whitespace-cropped PIL image.

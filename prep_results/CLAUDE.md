@@ -54,6 +54,11 @@ the notebooks actually import, so it's the binding contract, not the skill.
   reporting floor, else `'p = 0.036'`. Used for frequentist p-values and for
   Bayesian posterior tail probabilities (`prefix='p_bayes'`), so a tail with
   no draws on one side never prints as `p = 0.000`.
+- **Long measure labels:** `wrap_label()` — breaks a label onto two lines at the
+  point it already carries (after `'PMC-RDM: '`, before `' (Corsi span)'`), and
+  returns short labels untouched. Row labels on a correlation matrix set the
+  width of the whole left margin, so wrapping them is what buys the horizontal
+  room for panels beside the matrix.
 - **Panel letters:** `add_panel_letter()` — bold, Nature-style, top-left —
   for main panels (A, B, ...); `add_subpanel_label()` — smaller italic — for
   sub-panels grouped under one letter (i, ii, iii, ...).
@@ -76,9 +81,24 @@ the notebooks actually import, so it's the binding contract, not the skill.
   two scripts are redundant. Runs on the Mac, not the remote — needs
   `numrisk` + `pingouin` + the magjudge traces under
   `ds-dnumrisk/derivatives/cogmodels_magjudge`.
+  - Panel B's group tests are deliberately **one-sided** (`ALTERNATIVE =
+    {'correct': 'greater', 'rt': 'less'}`) — the a-priori hypothesis is that
+    dyscalculics are less accurate and slower, and the opposite direction was
+    never of interest. This was once silently reverted to two-sided while
+    folding `panelB_standalone.py` in, which moved RT from p = .026 to p = .051;
+    don't drop the `alternative=` argument, and keep the figure caption's
+    "one-sided" wording in step with it.
 - `paperDD_combFig1.ipynb` — **Fig. 4**, behaviour × neural cross-measure
-  correlations: panel A the |ρ| matrix, panel B scatters of the pairs that
-  survive it. Reworked from `thesis_ch-DD-neuro_01.ipynb`'s
+  correlations: panel A the |ρ| matrix, panels B/C the pairs that survive it,
+  laid out **horizontally** (matrix left, scatters stacked to its right) at the
+  7.25in double-column width, since the earlier stacked version overran a DIN A4
+  page. That layout is built with `fig.add_axes` from inch constants rather than
+  a GridSpec: the heatmap is square-aspect, so a GridSpec cell only *bounds* it
+  and the real box drifts with the figure size, pulling the colourbar and the
+  panel letters out of alignment. B and C carry the headings *Domain-specific* /
+  *Domain-general association*, keyed by measure pair in `PANEL_HEADINGS` — not
+  by panel position, so flipping the config switches leaves a panel unlabelled
+  rather than mislabelled. Reworked from `thesis_ch-DD-neuro_01.ipynb`'s
   `cross_measure_partial_r2_behav-neural_group-removed.pdf`: gradient measures
   and `mean_iq` dropped, cells show **|ρ| rather than ρ²** (shading unsigned,
   printed coefficient signed), and the two controls (partialling out group,
@@ -87,6 +107,13 @@ the notebooks actually import, so it's the binding contract, not the skill.
   `draw_heatmap(ax)` / `draw_scatter(ax, ...)` so the combined figure and the
   standalone exports share one code path. Same env as the behaviour figure
   (`behav_fit`, needs `numrisk` + `pingouin`).
+  - The Williams specificity tests are **one-tailed** (`expect='negative'` /
+    `expect='positive'` per call), matching Fig. 1B's policy: the claim is that a
+    behavioural measure tracks its *own* neural partner more closely than the
+    other one, so a difference in the wrong direction supports nothing and the
+    alpha is not split. Two-tailed would move IQ/DAN from p = .027 to p = .053.
+    `expect=` must stay an argument, never inferred from the observed sign —
+    reading the tail off the data is what would make it circular.
   - Two things not to undo when editing: `AXIS_CLIP` crops the perceptual-noise
     axis for readability but is **view-only** — the fit and the statistics keep
     all subjects, and `apply_clip` returns/prints the off-scale count so a
