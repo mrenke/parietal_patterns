@@ -133,3 +133,21 @@ SUBCORTICAL_LABELS = {
     47: (16, 'CIFTI_STRUCTURE_CEREBELLUM_RIGHT'),
     16: (17, 'CIFTI_STRUCTURE_BRAIN_STEM'),
 }
+
+
+# --- Group membership ---
+GROUP_FILE  = BIDS_ROOT / 'group_assignment.csv'
+GROUP_NAMES = {0: 'TD', 1: 'DD'}
+
+
+def get_groups() -> dict[str, int]:
+    """{'sub-XX': group} from GROUP_FILE (1 = DD / dyscalculia, 0 = TD / control)."""
+    import csv
+    with open(GROUP_FILE) as f:
+        return {f"sub-{int(row['subject']):02d}": int(row['group'])
+                for row in csv.DictReader(f)}
+
+
+# --- Excluded subjects (skipped by run_parallel.py and 07_group_avg_cm.py) ---
+# sub-05: only run-5 unusable — PFM redone on 5 runs (2026-07-15), kept in.
+EXCLUDE_SUBJECTS = {}

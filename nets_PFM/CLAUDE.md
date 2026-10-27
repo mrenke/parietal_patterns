@@ -32,16 +32,22 @@ Each `config_<dataset>.py` defines the same fields (`BIDS_ROOT`, `OUTPUT_ROOT`,
 - **Run count varies per subject** (93 subjects have 9 runs, 5 have 6) — `get_runs()`
   detects this by globbing confounds files rather than using a fixed list.
 - **Output redirected** to `/mnt_AdaBD_largefiles/Data/DNumRisk_Data/ds-asd/derivatives/pfm_fslr`
-  — `/mnt_asd` only has ~28 GB free, not enough for PFM derivatives across 98 subjects.
+  — `/mnt_asd` only has ~28 GB free, not enough for PFM derivatives across 98 subjects
+  (~4–5 GB/subject). `/mnt_asd/ds-asd/derivatives/pfm_fslr` is a symlink to it.
+  Rule: **inputs** (fmriprep, freesurfer) live on `/mnt_asd`, **PFM outputs** on largefiles.
 - **Reference atlases reused** from DNumRisk's `pfm_fslr/atlases/` (gordon17,
   caNets_DDnr) — these are dataset-independent labelling references, not duplicated.
-- **BLOCKER:** no `derivatives/freesurfer/` found anywhere for this dataset (checked
-  `/mnt_asd/ds-asd` and the `/mnt_AdaBD_largefiles` mirror). Step 02 needs
-  `sub-XX/surf/lh.sphere.reg.surf.gii` from FreeSurfer's recon-all output for the
-  fsnative→fsaverage→fsLR32k resampling. fMRIPrep (v20.2.3) clearly ran recon-all
-  internally (fsaverage5/fsnative surfaces exist in its output), but the FreeSurfer
-  SUBJECTS_DIR itself wasn't kept/exposed. Must be located or regenerated before
-  step 02 can run on this dataset.
+- **FreeSurfer:** only `sub-XX/surf/{lh,rh}.sphere.reg` synced (2026-10-26) from
+  `sciencecluster:/shares/zne.uzh/mrenke/ds-asd/derivatives/freesurfer` into
+  `/mnt_asd/ds-asd/derivatives/freesurfer` — same recon-all run as fMRIPrep's
+  anat surfaces; vertex counts verified to match for all 98 subjects.
+- **Steps 01–03 + 06 done for all 98 (2026-10-26)** except **sub-59: excluded**
+  (`EXCLUDE_SUBJECTS` in `config_asd.py`; 150/1161 frames retained, step 03 fails).
+  Retained data otherwise 16.6–45 min (median 41); lowest: sub-22 16.6 min,
+  sub-28 21.4, sub-73 23.0 — decide on a minimum-data cutoff before group stats.
+- **Mount:** `/mnt_asd` (and `/mnt_01`–`/mnt_04`) are in `/etc/fstab` by UUID with
+  `nofail` (added 2026-10-26) → auto-mounted at boot. `/mnt_AdaBD_largefiles` (CIFS)
+  is not — mount it manually after a reboot.
 
 ## Key File Paths
 
@@ -142,6 +148,13 @@ wb_command -metric-resample \
 - Source: T1w-space `aparcaseg_dseg.nii.gz` (FreeSurfer segmentation of native-space T1)
 - Structures: bilateral accumbens, amygdala, caudate, hippocampus, pallidum, putamen, thalamus + **cerebellar voxels**
 - Keep as individual voxels (not averaged into ROIs) — voxel-level data goes into CIFTI
+- ⚠️ **In practice, NO subcortical voxels end up in the CIFTI (found 2026-10-26).**
+  `SUBCORTICAL_LABELS` names the label-volume entries `CIFTI_STRUCTURE_THALAMUS_LEFT` etc.,
+  but `wb_command -cifti-create-dense-timeseries -volume` expects bare names
+  (`THALAMUS_LEFT`) and silently ignores unknown labels. All CIFTIs/CMs (DNumRisk + ASD)
+  are therefore **cortex-only: 59,412 grayordinates**. Stripping the prefix gives 65,570
+  (+6,158 subcortical/cerebellar voxels, tested on ASD sub-01 run-1). Kept as-is on
+  purpose so ASD stays comparable to DNumRisk — see "Pipeline variations to explore".
 
 ### Step 5 — Assemble CIFTI dtseries (per run)
 ```bash
@@ -234,6 +247,35 @@ python run_pipeline.py --subjects 1 2 3
 python run_pipeline.py --steps 03 04 04b
 ```
 
+### `run_parallel.py` — Many subjects concurrently (for step 04)
+One `run_pipeline.py` process per subject, at most `--jobs` at once (default from
+RAM / `--gb-per-job`, 20 GB). Starts of the first wave are staggered (`--stagger`,
+300 s) so 5%-density memory peaks don't coincide. Re-run to resume (completed
+steps are skipped). Per-subject output: `logs/<dataset>/parallel/sub-XX_runner.out`.
+```
+python run_parallel.py --dataset asd                 # steps 04 04b 05, all subjects
+python run_parallel.py --dataset asd --jobs 12 --start 10
+```
+**Memory:** Infomap at 5% density (~88M edges) needs ~20 GB — it was OOM-killed on
+the 32 GB VM (ASD sub-01, 2026-10-26, while step 03 ran in parallel). On that VM run
+step 04 one subject at a time; for the full ASD run use a large-RAM flavour.
+`04_infomap.py` now frees the CSR/COO copies before `im.run()` (results verified
+identical: deterministic default seed).
+
+### `07_group_avg_cm.py` — Group-average CM (pseudo-subject `sub-average`)
+Fisher-z average of all subjects' vertex-wise r, computed chunk-wise from the step-02
+concat CIFTIs (NOT from the sparse step-03 files — those are per-subject thresholded),
+then 30 mm exclusion + density thresholds exactly as step 03. Output goes to
+`OUTPUT_ROOT/sub-average[-<group>]/cm/` with step-03 naming, so 04/04b/05 run on it
+directly (they now accept non-numeric labels). `--group` uses `config.get_groups()`
+(ASD/Control; DD/TD). Holds all timeseries in RAM (~33 GB for 98 ASD subjects).
+Verified: with a single subject it reproduces that subject's step-03 CMs exactly.
+```
+python 07_group_avg_cm.py                  # all → sub-average
+python 07_group_avg_cm.py --group ASD      # → sub-average-ASD
+python 04_infomap.py average && python 04b_relabel.py average --ref ... && python 05_plot.py average
+```
+
 ### Optional utility: `03_corr_matrix.py`
 Parcellated CM (parcel-to-parcel, using a `.dlabel.nii` atlas). Not used for
 Infomap network detection, but useful for seed-based connectivity analyses,
@@ -273,7 +315,14 @@ QC, or comparison with other datasets. Requires `--parc` at runtime.
 
 ### `npc_net_ana.ipynb` — NPC Network Sizes & DAN Patch Topology
 
-Two group-level analyses on completed PFM results (65 subjects, sub-05 excluded; DD = group 1, TD = group 0):
+> **Final reported version (DD paper, Fig. 2):** `prep_results/paperDD_neuralFig2.ipynb` —
+> NPC Visual2/DAN composition + group-average DAN patches, `caNets_DDnr`, **66 subjects**
+> (sub-05 included on 5 runs). Use that notebook's numbers for reporting; this one is the
+> exploratory full breakdown.
+
+Two group-level analyses on completed PFM results (DD = group 1, TD = group 0). Note: the
+notebook's intro says "65 subjects, sub-05 excluded", but the exclusion line is commented
+out — sub-05 (5 runs) is included; the p-values below may predate that:
 
 **1. Network sizes within the NPC mask**
 - Restricts to a parietal NPC (numerosity processing cortex) ROI via `get_NPC_mask(space='fslr_den-32k', hemi='both')`.
@@ -303,7 +352,26 @@ Two group-level analyses on completed PFM results (65 subjects, sub-05 excluded;
 - [x] Pipeline running on all subjects (1–66) overnight
 - [x] `npc_net_ana.ipynb` — NPC network sizes + DAN patch topology, group comparisons (DD vs TD)
 
+## Pipeline variations to explore (bucket list)
+
+Goal: understand which pipeline choices actually shape the individual network maps
+(and the DAN/NPC results), by re-running variations on a few DNumRisk subjects and
+comparing against the current default.
+
+- [ ] **Subcortical/cerebellar voxels in the CM (True/False).** Current default: cortex-only
+      (unintentionally, see Step 4 note). To include them: strip `CIFTI_STRUCTURE_` from the
+      label names written by `make_label_volume()` in `02_surface_cifti.py`, rerun 02–04.
+      Question: do cortical communities (esp. parietal DAN) shift?
+- [ ] **Reference atlas for labelling (04b).** Candidates: `gordon17`, `caNets_DDnr`
+      (DNumRisk group average), an ASD group-average atlas (old fsav5 version in
+      `asd_pfm_ana/avg_network_atlas_fsav5_01.ipynb` looks odd — DAN only at 3% threshold).
+      Cheap to vary: 04b takes seconds per subject.
+- [ ] **New fsLR group-average atlas vs old fsav5 one** (`07_group_avg_cm.py`, all / ASD /
+      Control). Differences confound denoising (Friston-24+GSR vs 36P), density range
+      (0.3–5% vs 3–40%) and labelling (raw Infomap + 04b vs Jaccard-to-CA inside the run).
+
 ## References
+
 
 - Gordon et al. 2017, Neuron — original PFM paper
 - HCPpipelines resampling templates: `/home/ubuntu/git/HCPpipelines/global/templates/standard_mesh_atlases/`

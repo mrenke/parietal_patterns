@@ -25,12 +25,8 @@ from pathlib import Path
 from neuromaps.datasets import fetch_atlas
 
 sys.path.insert(0, str(Path(__file__).parent))
-from config import OUTPUT_ROOT, HCP_ATLASES, SESSION
+from config import OUTPUT_ROOT, HCP_ATLASES, SESSION, PLOT_DIR
 from utils_01 import get_gordon17_cmap, get_CANets_cmap
-
-
-PLOT_DIR = Path('/mnt_AdaBD_largefiles/Data/SMILE_Data/DNumRisk/ds-dnumrisk'
-                '/plots_and_ims/nets_PFM')
 
 REFS = {
     'gordon17':   {'vmax': 17, 'cmap': None},   # filled below
@@ -148,7 +144,9 @@ def main(subject: str) -> None:
 
 
 def parse_subject(s: str) -> str:
-    return f'sub-{int(s.removeprefix("sub-")):02d}'
+    """1 / 01 / sub-01 → sub-01; non-numeric labels kept (e.g. average → sub-average)."""
+    label = s.removeprefix('sub-')
+    return f'sub-{int(label):02d}' if label.isdigit() else f'sub-{label}'
 
 if __name__ == '__main__':
     if len(sys.argv) != 2:

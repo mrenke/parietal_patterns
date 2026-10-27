@@ -40,9 +40,21 @@ MIN_PATCH_AREA_MM2 = 30.0  # spatial patches smaller than this are removed + dil
 # Infomap runner
 # ---------------------------------------------------------------------------
 
-def run_infomap(csr: sp.csr_matrix, n_trials: int = 10) -> np.ndarray:
+def upper_edges(csr: sp.csr_matrix) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """(row, col, weight) of the upper triangle only, to avoid duplicate links."""
+    cx = csr.tocoo()
+    upper = cx.row < cx.col
+    return cx.row[upper], cx.col[upper], cx.data[upper]
+
+
+def run_infomap(edges: list[np.ndarray], n_nodes: int,
+                n_trials: int = 10) -> np.ndarray:
     """
-    Run Infomap on the sparse symmetric graph.
+    Run Infomap on the undirected graph given as a list of upper-triangle edge
+    arrays [row, col, weight] (see upper_edges). The list is cleared in place
+    after loading the links, so (with the caller holding no other reference)
+    only Infomap's own copy is in memory during im.run() — at 5% density the
+    duplicate CSR/COO copies were enough to OOM a 32 GB machine.
     Returns array of module ids, one per node (1-indexed, 0 = unassigned).
     """
     from infomap import Infomap
@@ -50,15 +62,14 @@ def run_infomap(csr: sp.csr_matrix, n_trials: int = 10) -> np.ndarray:
     im = Infomap(f'--two-level --silent --num-trials {n_trials}',
                  directed=False)
 
-    # Add edges (upper triangle only to avoid duplicate links)
-    cx = csr.tocoo()
-    upper = cx.row < cx.col
-    for s, t, w in zip(cx.row[upper], cx.col[upper], cx.data[upper]):
+    rows, cols, weights = edges
+    edges.clear()
+    for s, t, w in zip(rows, cols, weights):
         im.add_link(int(s), int(t), float(w))
+    del rows, cols, weights
 
     im.run()
 
-    n_nodes  = csr.shape[0]
     modules  = np.zeros(n_nodes, dtype=np.int32)
     for node in im.nodes:
         modules[node.node_id] = node.module_id
@@ -298,7 +309,9 @@ def main(subject: str, single_density: float | None = None) -> None:
         n_nodes = csr.shape[0]
         print(f'  Graph: {n_nodes} nodes, {csr.nnz//2:,} edges')
 
-        modules = run_infomap(csr)
+        edges = list(upper_edges(csr))
+        del csr   # free the full symmetric matrix before Infomap runs
+        modules = run_infomap(edges, n_nodes)   # empties `edges`
         modules = remove_small_communities(modules)
 
         n_assigned = (modules > 0).sum()
@@ -323,7 +336,9 @@ def main(subject: str, single_density: float | None = None) -> None:
 
 
 def parse_subject(s: str) -> str:
-    return f'sub-{int(s.removeprefix("sub-")):02d}'
+    """1 / 01 / sub-01 → sub-01; non-numeric labels kept (e.g. average → sub-average)."""
+    label = s.removeprefix('sub-')
+    return f'sub-{int(label):02d}' if label.isdigit() else f'sub-{label}'
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

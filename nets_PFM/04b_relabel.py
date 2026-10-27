@@ -92,7 +92,9 @@ def main(subject: str, ref_path: Path, ref_name: str | None,
 
 
 def parse_subject(s: str) -> str:
-    return f'sub-{int(s.removeprefix("sub-")):02d}'
+    """1 / 01 / sub-01 → sub-01; non-numeric labels kept (e.g. average → sub-average)."""
+    label = s.removeprefix('sub-')
+    return f'sub-{int(label):02d}' if label.isdigit() else f'sub-{label}'
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

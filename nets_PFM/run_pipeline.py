@@ -44,6 +44,11 @@ _pre.add_argument('--dataset', default=os.environ.get('PFM_DATASET', 'dnumrisk')
 _pre_args, _ = _pre.parse_known_args()
 os.environ['PFM_DATASET'] = _pre_args.dataset
 
+# Non-default datasets log to their own subfolder so per-subject logs
+# (sub-XX_pipeline.log) don't append onto DNumRisk's.
+if _pre_args.dataset != 'dnumrisk':
+    LOG_DIR = LOG_DIR / _pre_args.dataset
+
 from config import (ATLAS_DIR, OUTPUT_ROOT, PLOT_DIR, SESSION, TASK,
                      ALL_SUBJECTS, get_runs)
 

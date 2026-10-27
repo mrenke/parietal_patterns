@@ -5,32 +5,18 @@ import re
 BIDS_ROOT   = Path('/mnt_asd/ds-asd')
 FMRIPREP    = BIDS_ROOT / 'derivatives' / 'fmriprep'
 FREESURFER  = BIDS_ROOT / 'derivatives' / 'freesurfer'
-# NOTE: as of 2026-06-27 no derivatives/freesurfer/ exists for this dataset.
-# Step 02 (fsnative -> fsLR32k resampling) needs sub-XX/surf/lh.sphere.reg
-# from FreeSurfer's recon-all output. The original (FreeSurfer 6.0.1, run
-# inside fMRIPrep on the cluster) is inaccessible during cluster maintenance.
+# Only {lh,rh}.sphere.reg per subject are kept here (2026-10-26), synced from
+# the recon-all run inside fMRIPrep on the cluster
+# (sciencecluster:/shares/zne.uzh/mrenke/ds-asd/derivatives/freesurfer) —
+# same run as fMRIPrep's anat/*.surf.gii, vertex counts verified to match.
 
-# --- Local single-subject FreeSurfer test (temporary, 2026-06-27) ---
-# recon-all run locally with FreeSurfer 7.3.2 on sub-01's raw T1w, since the
-# cluster's FreeSurfer 6.0.1 dir can't be copied over right now. A locally
-# regenerated sphere.reg would NOT have matching vertex topology with
-# fMRIPrep's already-exported anat/*.surf.gii (different FreeSurfer version,
-# and recon-all's topology-fixing isn't guaranteed reproducible run-to-run
-# anyway) — so for this test subject ALL native surfaces (smoothwm, pial,
-# midthickness, sphere.reg) are derived from the one local recon-all run,
-# overriding fMRIPrep's anat outputs, to keep mesh topology self-consistent.
-# Remove these overrides once the real cluster FreeSurfer dirs are copied in.
-_LOCAL_TEST_ROOT = Path('/mnt_AdaBD_largefiles/Data/DNumRisk_Data/ds-asd'
-                         '/derivatives/freesurfer_local_test_fs7.3.2')
-FREESURFER_OVERRIDE = {
-    'sub-01': _LOCAL_TEST_ROOT,
-}
-ANAT_DIR_OVERRIDE = {
-    'sub-01': _LOCAL_TEST_ROOT / 'sub-01' / 'anat_gii',
-}
+# No overrides needed — kept for interface parity with config_dnumrisk.py.
+FREESURFER_OVERRIDE = {}
+ANAT_DIR_OVERRIDE   = {}
 
 # /mnt_asd is nearly full (~28 GB free) — redirect pfm_fslr outputs to the
-# largefiles mount instead of writing next to the input data.
+# largefiles mount instead of writing next to the input data
+# (~4-5 GB/subject x 98). /mnt_asd/ds-asd/derivatives/pfm_fslr is a symlink here.
 OUTPUT_ROOT = Path('/mnt_AdaBD_largefiles/Data/DNumRisk_Data/ds-asd'
                     '/derivatives/pfm_fslr')
 
@@ -159,4 +145,25 @@ SUBCORTICAL_LABELS = {
     58: (15, 'CIFTI_STRUCTURE_ACCUMBENS_RIGHT'),
     47: (16, 'CIFTI_STRUCTURE_CEREBELLUM_RIGHT'),
     16: (17, 'CIFTI_STRUCTURE_BRAIN_STEM'),
+}
+
+
+# --- Group membership ---
+GROUP_FILE  = BIDS_ROOT / 'derivatives' / 'participants_with_groups.csv'
+GROUP_NAMES = {0: 'Control', 1: 'ASD'}
+
+
+def get_groups() -> dict[str, int]:
+    """{'sub-XX': group} from GROUP_FILE (1 = ASD, 0 = Control).
+
+    sub-95..98 are not in the file (no group label) → absent from the dict.
+    """
+    import csv
+    with open(GROUP_FILE) as f:
+        return {row['participant_id']: int(row['group']) for row in csv.DictReader(f)}
+
+
+# --- Excluded subjects (skipped by run_parallel.py and 07_group_avg_cm.py) ---
+EXCLUDE_SUBJECTS = {
+    59: 'motion: 80-94% frames censored per run, 150/1161 retained (5.8 min); step 03 fails',
 }
