@@ -50,6 +50,15 @@ the notebooks actually import, so it's the binding contract, not the skill.
   to a whitespace-auto-cropped PIL image so panels pack into a matplotlib
   `GridSpec` without manual trimming. Works with fsaverage5 or fsLR 32k
   surfaces/maps interchangeably — Fig 1 uses fsaverage5, Fig 2 uses fsLR 32k.
+- **p-values:** `format_pvalue(p, prefix='p')` — `'p < 0.001'` below the
+  reporting floor, else `'p = 0.036'`. Used for frequentist p-values and for
+  Bayesian posterior tail probabilities (`prefix='p_bayes'`), so a tail with
+  no draws on one side never prints as `p = 0.000`.
+- **Long measure labels:** `wrap_label()` — breaks a label onto two lines at the
+  point it already carries (after `'PMC-RDM: '`, before `' (Corsi span)'`), and
+  returns short labels untouched. Row labels on a correlation matrix set the
+  width of the whole left margin, so wrapping them is what buys the horizontal
+  room for panels beside the matrix.
 - **Panel letters:** `add_panel_letter()` — bold, Nature-style, top-left —
   for main panels (A, B, ...); `add_subpanel_label()` — smaller italic — for
   sub-panels grouped under one letter (i, ii, iii, ...).
@@ -73,6 +82,56 @@ CSV, same as the figures.
 
 ## Figures in this folder
 
+- `paperDD_behavFig1.ipynb` — **all behavioural figure code**, in three
+  independent sections: Fig. 1 panel B (accuracy/RT bar+swarm + choice curves
+  carrying the probit interaction p_bayes), Fig. 1 panel D (`rdm_full_cont`
+  group posteriors), and the magnitude-comparison **parameter correlation
+  matrix** (same |ρ| + stars idiom as Fig. 4, one triangle, applied within the
+  task). Each section exports a **standalone drop-in PDF** — Fig. 1 itself is
+  assembled by hand in Affinity, so this notebook deliberately does *not*
+  build a combined figure. Panels B and D were formerly
+  `panelB_standalone.py` / `panelD_standalone.py`, now folded in here; those
+  two scripts are redundant. Runs on the Mac, not the remote — needs
+  `numrisk` + `pingouin` + the magjudge traces under
+  `ds-dnumrisk/derivatives/cogmodels_magjudge`.
+  - Panel B's group tests are deliberately **one-sided** (`ALTERNATIVE =
+    {'correct': 'greater', 'rt': 'less'}`) — the a-priori hypothesis is that
+    dyscalculics are less accurate and slower, and the opposite direction was
+    never of interest. This was once silently reverted to two-sided while
+    folding `panelB_standalone.py` in, which moved RT from p = .026 to p = .051;
+    don't drop the `alternative=` argument, and keep the figure caption's
+    "one-sided" wording in step with it.
+- `paperDD_combFig1.ipynb` — **Fig. 4**, behaviour × neural cross-measure
+  correlations: panel A the |ρ| matrix, panels B/C the pairs that survive it,
+  laid out **horizontally** (matrix left, scatters stacked to its right) at the
+  7.25in double-column width, since the earlier stacked version overran a DIN A4
+  page. That layout is built with `fig.add_axes` from inch constants rather than
+  a GridSpec: the heatmap is square-aspect, so a GridSpec cell only *bounds* it
+  and the real box drifts with the figure size, pulling the colourbar and the
+  panel letters out of alignment. B and C carry the headings *Domain-specific* /
+  *Domain-general association*, keyed by measure pair in `PANEL_HEADINGS` — not
+  by panel position, so flipping the config switches leaves a panel unlabelled
+  rather than mislabelled. Reworked from `thesis_ch-DD-neuro_01.ipynb`'s
+  `cross_measure_partial_r2_behav-neural_group-removed.pdf`: gradient measures
+  and `mean_iq` dropped, cells show **|ρ| rather than ρ²** (shading unsigned,
+  printed coefficient signed), and the two controls (partialling out group,
+  multiple-comparison correction) are independent switches in the config cell —
+  the output filename encodes which were on. Both panels are drawn by
+  `draw_heatmap(ax)` / `draw_scatter(ax, ...)` so the combined figure and the
+  standalone exports share one code path. Same env as the behaviour figure
+  (`behav_fit`, needs `numrisk` + `pingouin`).
+  - The Williams specificity tests are **one-tailed** (`expect='negative'` /
+    `expect='positive'` per call), matching Fig. 1B's policy: the claim is that a
+    behavioural measure tracks its *own* neural partner more closely than the
+    other one, so a difference in the wrong direction supports nothing and the
+    alpha is not split. Two-tailed would move IQ/DAN from p = .027 to p = .053.
+    `expect=` must stay an argument, never inferred from the observed sign —
+    reading the tail off the data is what would make it circular.
+  - Two things not to undo when editing: `AXIS_CLIP` crops the perceptual-noise
+    axis for readability but is **view-only** — the fit and the statistics keep
+    all subjects, and `apply_clip` returns/prints the off-scale count so a
+    clipped panel can't silently drop a point. And string literals carrying
+    mathtext need an `r` prefix — a bare `'\\rho'` is a carriage return.
 - `paperDD_neuralFig1.ipynb` — nPRF R² in NPC (group-mean surfaces) + 3
   robustness-check bar panels.
 - `paperDD_neuralFig2.ipynb` — PFM/DAN patch results (group-average DAN
