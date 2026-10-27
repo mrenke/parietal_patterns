@@ -58,6 +58,19 @@ the notebooks actually import, so it's the binding contract, not the skill.
 - **Vector export:** `pdf.fonttype=42` / `svg.fonttype='none'` keep exported
   text editable/non-outlined — don't override these per-figure.
 
+## Summary tables
+
+Not just figures -- paper-ready descriptive-stats tables follow one house
+format too, via `compact_summary_table()` in `utils/statistics.py`: one row
+per measure, columns `'{group} ({unit} ± SD)'` (x2, one per group),
+`'Statistic'`, `'p (uncorr)'`. Takes the `{measure: (stat, stats_term)}` dict
+already produced by looping `between_group_comparison()` over the measures --
+see `paperDD_neuralFig1.ipynb`/`paperDD_neuralFig2.ipynb` for the pattern.
+`unit` applies to every measure in one call (call it once per unit-group
+when a notebook mixes units, e.g. Fig 1's unitless R² vs. vertex/voxel
+counts). Always save the resulting table to `plot_folder` as a companion
+CSV, same as the figures.
+
 ## Figures in this folder
 
 - `paperDD_neuralFig1.ipynb` — nPRF R² in NPC (group-mean surfaces) + 3

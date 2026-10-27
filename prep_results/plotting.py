@@ -104,14 +104,45 @@ def add_panel_letter(ax, letter, dx=-0.15, dy=1.05, fontsize=12):
             fontweight='bold', va='bottom', ha='right')
 
 
-def add_subpanel_label(ax, label, dx=-0.15, dy=1.05, fontsize=9):
-    """Small italic sub-panel index (i, ii, iii, ...) for panels grouped under one main letter."""
+def add_subpanel_label(ax, label, dx=0.5, dy=1.05, fontsize=9):
+    """Small italic sub-panel label, top-center, outside the axes.
+
+    Centered (rather than right-anchored like add_panel_letter) because these
+    labels are often full patch/condition names, not single characters --
+    right-anchoring a long string makes it drift left of the panel it names.
+    """
     ax.text(dx, dy, label, transform=ax.transAxes, fontsize=fontsize,
-            fontstyle='italic', va='bottom', ha='right', color='0.2')
+            fontstyle='italic', va='bottom', ha='center', color='0.2')
+
+
+def panel_bracket_y(values):
+    """Height of the significance bracket, matching plot_group_comparison_panel's own
+    calculation. Precompute across paired panels (e.g. L/R hemispheres) and pass the
+    max as `bracket_y` alongside a shared `ymax` (see panel_top()) -- otherwise, once
+    paired panels share a y-scale, whichever panel has the smaller data range gets a
+    bracket that reads as oddly low relative to its now-taller shared axis.
+    """
+    values = np.asarray(values)
+    y_span = values.max() - values.min()
+    return values.max() + 0.08 * y_span
+
+
+def panel_top(values):
+    """Headroom-adjusted upper y-limit, matching plot_group_comparison_panel's own
+    calculation. Precompute this across a set of paired panels (e.g. L/R hemispheres
+    of the same measure) and pass the max as `ymax` so they share a y-scale -- panels
+    left to autoscale independently end up with slightly different top limits relative
+    to the tick grid, which trims their spines (sns.despine(trim=True)) to visibly
+    different lengths even when the tick values look the same.
+    """
+    values = np.asarray(values)
+    y_span = values.max() - values.min()
+    return panel_bracket_y(values) + 0.18 * y_span
 
 
 def plot_group_comparison_panel(ax, df_plot, measure, ylabel, stat,
-                                 order=GROUP_ORDER, palette=GROUP_PALETTE, ymin=None):
+                                 order=GROUP_ORDER, palette=GROUP_PALETTE, ymin=None,
+                                 ymax=None, bracket_y=None, dot_size=4):
     """One panel: bar (alpha=0.5) + swarm overlay + a significance bracket with the p-value.
 
     Matches the bar+swarm idiom already used for group comparisons elsewhere in
@@ -121,18 +152,25 @@ def plot_group_comparison_panel(ax, df_plot, measure, ylabel, stat,
     ymin: optional zoomed-in lower y-limit (bars still drawn from 0, only the
     view is cropped) for a measure whose distribution is hard to see against a
     from-zero axis.
+    ymax, bracket_y: optional shared upper y-limit / bracket height (see panel_top(),
+    panel_bracket_y()) -- pass both together so paired panels align on the same scale
+    *and* the same bracket height, rather than each autoscaling independently.
+    dot_size: swarmplot marker size -- shrink this for narrow panels (e.g. a
+    small-multiples grid) where the default overflows and seaborn starts
+    dropping points ("X% of the points cannot be placed").
     """
     sns.barplot(data=df_plot, x='group_label', y=measure, hue='group_label',
                 order=order, hue_order=order, palette=palette, alpha=0.5,
                 legend=False, ax=ax)
     sns.swarmplot(data=df_plot, x='group_label', y=measure, hue='group_label',
-                  order=order, hue_order=order, palette=palette, size=4,
+                  order=order, hue_order=order, palette=palette, size=dot_size,
                   legend=False, ax=ax)
 
     # significance bracket spanning the two bars (x=0, x=1), short legs that stay
     # well clear of the bars/swarm, with just the p-value (no test statistic)
     y_span = df_plot[measure].max() - df_plot[measure].min()
-    bracket_y = df_plot[measure].max() + 0.08 * y_span
+    if bracket_y is None:
+        bracket_y = df_plot[measure].max() + 0.08 * y_span
     leg = 0.03 * y_span
     ax.plot([0, 0, 1, 1], [bracket_y - leg, bracket_y, bracket_y, bracket_y - leg],
             lw=0.8, color='0.15')
@@ -141,7 +179,7 @@ def plot_group_comparison_panel(ax, df_plot, measure, ylabel, stat,
     p_txt = 'p < 0.001' if p < 0.001 else f'p = {p:.3f}'
     ax.text(0.5, bracket_y, p_txt, ha='center', va='bottom', fontsize=7, color='0.15')
 
-    ax.set_ylim(top=bracket_y + 0.18 * y_span)
+    ax.set_ylim(top=ymax if ymax is not None else bracket_y + 0.18 * y_span)
     if ymin is not None:
         ax.set_ylim(bottom=ymin)
     ax.set_xlabel('')
