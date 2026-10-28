@@ -234,8 +234,10 @@ def filter_small_patches(network_labels: np.ndarray,
 
     Parameters
     ----------
-    network_labels : (n_valid,) int32 — reference network labels for valid vertices
-    valid_mask     : (n_cortex,) bool — which of the ~59k cortical vertices are valid
+    network_labels : (n_valid,) int32 — reference network labels for valid grayordinates
+    valid_mask     : (n_grayordinates,) bool — cortex (~59k: L, then R) followed by
+                     any subcortical voxels (PFM_VARIANT=subcort); the latter are
+                     passed through unfiltered
     min_area_mm2   : area threshold in mm² (default 30)
 
     Returns
@@ -249,15 +251,16 @@ def filter_small_patches(network_labels: np.ndarray,
     adj_L, areas_L = _build_surface_adj_and_areas(FSLR_MIDTHICK['L'])
     adj_R, areas_R = _build_surface_adj_and_areas(FSLR_MIDTHICK['R'])
 
-    # Expand valid-mask labels → full cortex space
-    cortex_labels = np.zeros(n_cortex_L + roi_R.sum(), dtype=np.int32)
-    cortex_labels[valid_mask] = network_labels
+    # Expand valid-mask labels → full grayordinate space
+    n_cortex = n_cortex_L + roi_R.sum()
+    cifti_labels = np.zeros(len(valid_mask), dtype=np.int32)
+    cifti_labels[valid_mask] = network_labels
 
-    # Expand cortex space → full 32k hemisphere arrays
+    # Expand cortex part → full 32k hemisphere arrays
     full_L = np.zeros(32492, dtype=np.int32)
-    full_L[roi_L] = cortex_labels[:n_cortex_L]
+    full_L[roi_L] = cifti_labels[:n_cortex_L]
     full_R = np.zeros(32492, dtype=np.int32)
-    full_R[roi_R] = cortex_labels[n_cortex_L:]
+    full_R[roi_R] = cifti_labels[n_cortex_L:n_cortex]
 
     full_L, rm_L = _filter_hemi(full_L, adj_L, areas_L, roi_L, min_area_mm2)
     full_R, rm_R = _filter_hemi(full_R, adj_R, areas_R, roi_R, min_area_mm2)
@@ -267,8 +270,8 @@ def filter_small_patches(network_labels: np.ndarray,
               f'({rm_L} L, {rm_R} R)')
 
     # Collapse back → valid_mask space
-    cortex_new = np.concatenate([full_L[roi_L], full_R[roi_R]])
-    return cortex_new[valid_mask].astype(np.int32)
+    cifti_labels[:n_cortex] = np.concatenate([full_L[roi_L], full_R[roi_R]])
+    return cifti_labels[valid_mask].astype(np.int32)
 
 
 # ---------------------------------------------------------------------------

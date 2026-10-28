@@ -26,3 +26,21 @@ _module = _import_module(_DATASETS[_dataset])
 
 # Re-export everything from the active dataset config
 globals().update({k: v for k, v in vars(_module).items() if not k.startswith('_')})
+
+# --- Pipeline variant — selected via the PFM_VARIANT environment variable ---
+#   (unset)  default: cortex-only CIFTIs (59,412 grayordinates; see the Step 4
+#            note in CLAUDE.md for why no subcortical voxels end up in them)
+#   subcort  subcortical + cerebellar voxels included in the CIFTI (step 02 on).
+#            Reuses the default run's step-01 outputs (DENOISED_ROOT); everything
+#            from step 02 on goes to <OUTPUT_ROOT>_subcort (and <PLOT_DIR>_subcort).
+#   PFM_DATASET=asd PFM_VARIANT=subcort python 02_surface_cifti.py sub-01
+_VARIANTS = {'', 'subcort'}
+VARIANT = os.environ.get('PFM_VARIANT', '')
+if VARIANT not in _VARIANTS:
+    raise ValueError(f'Unknown PFM_VARIANT={VARIANT!r}. Choose one of: {sorted(_VARIANTS)}')
+
+DENOISED_ROOT       = OUTPUT_ROOT
+INCLUDE_SUBCORTICAL = VARIANT == 'subcort'
+if VARIANT:
+    OUTPUT_ROOT = OUTPUT_ROOT.with_name(f'{OUTPUT_ROOT.name}_{VARIANT}')
+    PLOT_DIR    = PLOT_DIR.with_name(f'{PLOT_DIR.name}_{VARIANT}')

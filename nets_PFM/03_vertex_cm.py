@@ -4,14 +4,14 @@ Step 3 — Vertex-wise correlation matrix (Gordon 2017 protocol).
 
 Computes the all-to-all cross-correlation matrix of the CIFTI timeseries
 (cortical surface vertices + subcortical voxels), loosely following Gordon 2017,
-with two known deviations from that protocol (see nets_PFM/CLAUDE.md):
+with one known deviation from that protocol (see nets_PFM/CLAUDE.md):
   - Correlations between same-hemisphere surface nodes within 30 mm are set to
     zero. Distance is approximated as Euclidean between midthickness coordinates
     rather than true geodesic (geodesic would require a much more expensive
     computation). Since Euclidean <= geodesic on a folded surface, this zeroes a
     *superset* of what a true geodesic criterion would zero, not a subset.
-  - Pairs involving subcortical voxels are NOT zeroed regardless of distance
-    (Gordon et al. 2017 apply a Euclidean-distance criterion here; we don't).
+  - Pairs involving a subcortical voxel are zeroed within 30 mm Euclidean, as in
+    Gordon 2017 (only matters for PFM_VARIANT=subcort; default CIFTIs are cortex-only).
   - The matrix is thresholded at each target density and saved as a
     scipy sparse matrix (.npz), one file per density threshold.
 
@@ -103,7 +103,7 @@ def estimate_thresholds(ts_norm: np.ndarray, coords: np.ndarray,
 
     Strategy:
       1. Sample n_sample random upper-triangle pairs.
-      2. Compute their distances and mark local pairs (< 30 mm, same-hemi surface).
+      2. Compute their distances and mark local pairs (< 30 mm; same-hemi surface or subcortical).
       3. Compute Pearson r for non-local pairs.
       4. Estimate what fraction of ALL pairs are local (local_frac).
       5. For each density d:
@@ -123,7 +123,7 @@ def estimate_thresholds(ts_norm: np.ndarray, coords: np.ndarray,
     dist_s   = np.linalg.norm(coords[i_s] - coords[j_s], axis=1)
     same_hem = hemi_ids[i_s] == hemi_ids[j_s]
     both_srf = (hemi_ids[i_s] < 2) & (hemi_ids[j_s] < 2)
-    is_local = (dist_s < CM_DIST_CUTOFF_MM) & same_hem & both_srf
+    is_local = (dist_s < CM_DIST_CUTOFF_MM) & (same_hem | ~both_srf)
 
     local_frac = is_local.mean()
     print(f'  Estimated local-pair fraction: {100*local_frac:.1f}%')
@@ -161,7 +161,7 @@ def compute_sparse_cms(ts_norm: np.ndarray, coords: np.ndarray,
     Compute the upper-triangle correlation matrix in row-chunks.
     For each chunk:
       - Compute r (chunk_size × n_nodes) via dot product of normalised series.
-      - Zero local connections (within 30 mm, same-hemisphere surface).
+      - Zero local connections (within 30 mm; same-hemi surface or subcortical).
       - Retain only upper-triangle entries (col > row).
       - For each density, accumulate entries above the threshold.
 
@@ -185,11 +185,12 @@ def compute_sparse_cms(ts_norm: np.ndarray, coords: np.ndarray,
         # Correlations: (cs × n_nodes)
         r = (ts_norm[:, start:end].T @ ts_norm)   # already unit-norm
 
-        # Zero local connections (same-hemisphere surface within 30 mm)
+        # Zero local connections (< 30 mm): same-hemisphere surface pairs, and any
+        # pair involving a subcortical voxel (Euclidean, as in Gordon 2017)
         dist = cdist(coords[start:end], coords)    # (cs × n_nodes) float64
         same_hem = hemi_ids[start:end, None] == hemi_ids[None, :]
         both_srf = (hemi_ids[start:end] < 2)[:, None] & (hemi_ids < 2)[None, :]
-        local    = (dist < CM_DIST_CUTOFF_MM) & same_hem & both_srf
+        local    = (dist < CM_DIST_CUTOFF_MM) & (same_hem | ~both_srf)
         r[local] = 0.0
 
         # Upper triangle mask (global col > global row)

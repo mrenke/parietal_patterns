@@ -49,7 +49,7 @@ os.environ['PFM_DATASET'] = _pre_args.dataset
 if _pre_args.dataset != 'dnumrisk':
     LOG_DIR = LOG_DIR / _pre_args.dataset
 
-from config import (ATLAS_DIR, OUTPUT_ROOT, PLOT_DIR, SESSION, TASK,
+from config import (ATLAS_DIR, OUTPUT_ROOT, DENOISED_ROOT, PLOT_DIR, SESSION, TASK,
                      ALL_SUBJECTS, get_runs)
 
 REF_GORDON = ATLAS_DIR / 'gordon17_space-fsLR_den-32k_cortex.npz'
@@ -98,7 +98,7 @@ def get_frame_counts(subject: str) -> dict:
     Load per-run scrub masks and return retained-frame statistics.
     Returns dict with keys: total, retained, fraction. None if masks missing.
     """
-    den_dir = OUTPUT_ROOT / subject / 'denoised'
+    den_dir = DENOISED_ROOT / subject / 'denoised'
     total = retained = 0
     found = 0
     for run in get_runs(subject):
@@ -128,7 +128,7 @@ def is_done(subject: str, step: str) -> bool:
     stem    = f'{subject}_{SESSION}_space-fsLR32k'
     checks  = {
         '01':  all(
-            (sub_dir / 'denoised' /
+            (DENOISED_ROOT / subject / 'denoised' /
              f'{subject}_{SESSION}_task-{TASK}_run-{r}_desc-scrubmask.npy').exists()
             for r in get_runs(subject)
         ) or (sub_dir / 'cifti' / f'{stem}_bold_concat.dtseries.nii').exists(),

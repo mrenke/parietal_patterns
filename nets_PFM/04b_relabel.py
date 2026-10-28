@@ -51,7 +51,10 @@ def main(subject: str, ref_path: Path, ref_name: str | None,
     print(f'[{subject}] Loading reference atlas: {ref_path.name}')
     meta       = np.load(cm_dir / f'{subject}_{SESSION}_space-fsLR32k_cm_meta.npz')
     valid_mask = meta['valid_mask']
-    ref_labels_cifti = load_reference_labels(ref_path)
+    ref_labels_cifti = load_reference_labels(ref_path)   # cortex only
+    # Subcortical voxels (PFM_VARIANT=subcort, after the cortex) get ref 0: they
+    # don't vote, but take the label of the community they belong to
+    ref_labels_cifti = np.pad(ref_labels_cifti, (0, len(valid_mask) - len(ref_labels_cifti)))
     ref_labels = ref_labels_cifti[valid_mask]
     ref_tag    = f'_ref-{ref_name or ref_path.name.split("_space-")[0]}'
     print(f'  {len(np.unique(ref_labels[ref_labels > 0]))} reference networks, '

@@ -6,12 +6,13 @@ Per run:
   1. Ribbon-constrained volume → fsnative surface (wb_command)
   2. Resample fsnative → fsLR 32k (wb_command)
   3. Extract subcortical timeseries from T1w volume + create label volume
+     (only with PFM_VARIANT=subcort; default CIFTIs are cortex-only)
   4. Assemble CIFTI dtseries (wb_command)
   5. Smooth CIFTI, σ = 2.55 mm (wb_command)
 
   output: 
   sub-XX_ses-1_task-magjudge_run-X_space-fsLR32k_bold_smooth.dtseries.nii
-  -->  CIFTI, surface + subcortical combined, NIfTI-2 container (intent code in the header marks it as a CIFTI dtseries)
+  -->  CIFTI, surface (+ subcortical if INCLUDE_SUBCORTICAL), NIfTI-2 container (intent code in the header marks it as a CIFTI dtseries)
 
 Then concatenate all runs into one session CIFTI.
 
@@ -27,10 +28,10 @@ import pandas as pd
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from config import (FMRIPREP, FREESURFER, OUTPUT_ROOT, SESSION, TASK, get_runs,
+from config import (FMRIPREP, FREESURFER, OUTPUT_ROOT, DENOISED_ROOT, SESSION, TASK, get_runs,
                     TR, SMOOTH_SIGMA, WB_COMMAND, MRIS_CONVERT,
                     FSLR_SPHERE, FSLR_MIDTHICK, FSLR_ROI, SUBCORTICAL_LABELS,
-                    FREESURFER_OVERRIDE, ANAT_DIR_OVERRIDE)
+                    FREESURFER_OVERRIDE, ANAT_DIR_OVERRIDE, INCLUDE_SUBCORTICAL)
 
 
 # ---------------------------------------------------------------------------
@@ -123,16 +124,17 @@ def extract_subcortical_ts(bold_path: Path, label_mask_path: Path,
 # ---------------------------------------------------------------------------
 
 def process_run(subject: str, run: int, surf_dir: Path,
-                label_vol: Path, out_dir: Path) -> Path:
+                label_vol: Path | None, out_dir: Path) -> Path:
     """
     Run ribbon mapping + fsLR resampling + CIFTI assembly + smoothing.
+    label_vol=None → cortex-only CIFTI (no subcortical voxels).
     Returns path to smoothed per-run CIFTI.
     """
     func_dir    = FMRIPREP / subject / SESSION / 'func'
     fs_surf_dir = FREESURFER_OVERRIDE.get(subject, FREESURFER) / subject / 'surf'
     stem = f'{subject}_{SESSION}_task-{TASK}_run-{run}'
 
-    denoised_path = OUTPUT_ROOT / subject / 'denoised' / \
+    denoised_path = DENOISED_ROOT / subject / 'denoised' / \
                     f'{stem}_desc-denoised_bold.nii.gz'
     if not denoised_path.exists():
         raise FileNotFoundError(f'Run 01_denoise.py first: {denoised_path}')
@@ -163,19 +165,21 @@ def process_run(subject: str, run: int, surf_dir: Path,
 
         cifti_paths[hemi] = fslr_gii
 
-    # Extract subcortical timeseries
-    aparcaseg = func_dir / f'{stem}_space-T1w_desc-aparcaseg_dseg.nii.gz'
-    subcort_bold = extract_subcortical_ts(denoised_path, aparcaseg, tmp, stem)
+    # Subcortical timeseries → appended after the cortex in the CIFTI
+    volume_args = []
+    if label_vol is not None:
+        aparcaseg = func_dir / f'{stem}_space-T1w_desc-aparcaseg_dseg.nii.gz'
+        subcort_bold = extract_subcortical_ts(denoised_path, aparcaseg, tmp, stem)
+        volume_args = ['-volume', subcort_bold, label_vol]
 
     # Assemble CIFTI dtseries
     raw_cifti = tmp / f'{stem}_space-fsLR32k_bold.dtseries.nii'
-    n_retained = nib.load(denoised_path).shape[3]
     wb(['-cifti-create-dense-timeseries', raw_cifti,
         '-left-metric',  cifti_paths['L'],
         '-roi-left',     FSLR_ROI['L'],
         '-right-metric', cifti_paths['R'],
         '-roi-right',    FSLR_ROI['R'],
-        '-volume',       subcort_bold, label_vol,
+        *volume_args,
         '-timestep',     f'{TR:.4f}'])
 
     # Smooth CIFTI
@@ -198,16 +202,20 @@ def main(subject: str) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # Build the subcortical label volume once (same anatomy for all runs)
-    print(f'[{subject}] Building subcortical label volume ...')
-    aparcaseg_run1 = (FMRIPREP / subject / SESSION / 'func' /
-                      f'{subject}_{SESSION}_task-{TASK}_run-1'
-                      '_space-T1w_desc-aparcaseg_dseg.nii.gz')
-    label_vol, _ = make_label_volume(aparcaseg_run1, out_dir)
+    label_vol = None
+    if INCLUDE_SUBCORTICAL:
+        print(f'[{subject}] Building subcortical label volume ...')
+        aparcaseg_run1 = (FMRIPREP / subject / SESSION / 'func' /
+                          f'{subject}_{SESSION}_task-{TASK}_run-1'
+                          '_space-T1w_desc-aparcaseg_dseg.nii.gz')
+        label_vol, _ = make_label_volume(aparcaseg_run1, out_dir)
+    else:
+        print(f'[{subject}] Cortex only (set PFM_VARIANT=subcort to add subcortical voxels)')
 
     skipped = []
     run_ciftis = []
     for run in get_runs(subject):
-        denoised_path = (OUTPUT_ROOT / subject / 'denoised' /
+        denoised_path = (DENOISED_ROOT / subject / 'denoised' /
                          f'{subject}_{SESSION}_task-{TASK}_run-{run}_desc-denoised_bold.nii.gz')
         if not denoised_path.exists():
             print(f'\n[{subject}] run-{run}  [SKIP — denoised output missing]')

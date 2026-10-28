@@ -23,6 +23,20 @@ python 01_denoise.py sub-01                  # dnumrisk (default)
 PFM_DATASET=asd python 01_denoise.py sub-01  # ds-asd
 python run_pipeline.py --dataset asd         # run_pipeline.py also takes --dataset
 ```
+### Pipeline variants (`PFM_VARIANT`)
+A second env var selects a pipeline variant on top of the dataset (`config.py`):
+```bash
+PFM_DATASET=asd PFM_VARIANT=subcort python 02_surface_cifti.py sub-01
+```
+- `subcort`: subcortical + cerebellar voxels in the CIFTI (65,570 grayordinates instead
+  of 59,412; see the Step 4 note). Reuses the default run's step-01 outputs
+  (`DENOISED_ROOT` = the default `OUTPUT_ROOT`); steps 02+ write to
+  `<OUTPUT_ROOT>_subcort/` (e.g. `.../ds-asd/derivatives/pfm_fslr_subcort/`) and plots
+  to `<PLOT_DIR>_subcort/`. So only run steps 02 onward with a variant set.
+- In 04b, subcortical voxels have no reference label (the atlases are cortex-only): they
+  don't vote, but get the label of the Infomap community they belong to. The 30 mm²
+  patch filter and 05's surface plots only touch the cortex part.
+
 Each `config_<dataset>.py` defines the same fields (`BIDS_ROOT`, `OUTPUT_ROOT`,
 `ATLAS_DIR`, `PLOT_DIR`, `SESSION`, `TASK`, `TR`, `ALL_SUBJECTS`, plus a
 `get_runs(subject)` function — run counts aren't assumed fixed across subjects).
@@ -148,13 +162,16 @@ wb_command -metric-resample \
 - Source: T1w-space `aparcaseg_dseg.nii.gz` (FreeSurfer segmentation of native-space T1)
 - Structures: bilateral accumbens, amygdala, caudate, hippocampus, pallidum, putamen, thalamus + **cerebellar voxels**
 - Keep as individual voxels (not averaged into ROIs) — voxel-level data goes into CIFTI
-- ⚠️ **In practice, NO subcortical voxels end up in the CIFTI (found 2026-10-26).**
-  `SUBCORTICAL_LABELS` names the label-volume entries `CIFTI_STRUCTURE_THALAMUS_LEFT` etc.,
-  but `wb_command -cifti-create-dense-timeseries -volume` expects bare names
-  (`THALAMUS_LEFT`) and silently ignores unknown labels. All CIFTIs/CMs (DNumRisk + ASD)
-  are therefore **cortex-only: 59,412 grayordinates**. Stripping the prefix gives 65,570
-  (+6,158 subcortical/cerebellar voxels, tested on ASD sub-01 run-1). Kept as-is on
-  purpose so ASD stays comparable to DNumRisk — see "Pipeline variations to explore".
+- ⚠️ **Default is cortex-only (59,412 grayordinates); subcortical voxels only with
+  `PFM_VARIANT=subcort`** (65,570; see "Pipeline variants").
+  History: until 2026-10-27, `SUBCORTICAL_LABELS` named the structures
+  `CIFTI_STRUCTURE_THALAMUS_LEFT` etc., but `wb_command -cifti-create-dense-timeseries
+  -volume` expects bare names (`THALAMUS_LEFT`) and silently drops voxels under unknown
+  labels — so all existing CIFTIs/CMs (DNumRisk + ASD) are cortex-only, unintentionally.
+  Now explicit: names fixed in the configs, and 02 only builds the label volume / passes
+  `-volume` when `INCLUDE_SUBCORTICAL`. Verified on ASD sub-01 run-1: the new code
+  reproduces both the old cortex-only and the subcort CIFTI exactly. ASD sub-01:
+  cerebellum 1,837 L + 1,846 R, brainstem 848, thalamus 291/280, rest < 150 each.
 
 ### Step 5 — Assemble CIFTI dtseries (per run)
 ```bash
@@ -187,8 +204,9 @@ The full ~90k × 90k dense matrix is never materialised — computed in row-chun
 
 - **30 mm proximity zeroing:** same-hemisphere surface pairs within 30 mm set to 0.
   Distance approximated as Euclidean on midthickness coordinates rather than true
-  surface geodesic distance. Inter-hemispheric and subcortical pairs are retained
-  regardless of distance.
+  surface geodesic distance. Inter-hemispheric surface pairs are retained regardless
+  of distance. Pairs involving a subcortical voxel are zeroed within 30 mm Euclidean
+  (added 2026-10-27; no-op for the cortex-only default CIFTIs).
   - **Deviation from Gordon et al. 2017:** Gordon et al. use true geodesic distance
     for within-hemisphere surface pairs and a Euclidean-distance criterion for
     subcortical pairs. Our implementation deviates on both counts: (1) surface pairs
@@ -197,10 +215,11 @@ The full ~90k × 90k dense matrix is never materialised — computed in row-chun
     would (e.g. vertices on opposite banks of a sulcus can be <30mm apart in a
     straight line despite a much longer cortical path), i.e. it is if anything
     slightly more conservative, not less (the code comment previously claimed the
-    opposite — that was wrong and has been corrected here); (2) no proximity
-    exclusion at all is applied to subcortical/cerebellar pairs (Gordon et al. do
-    apply one). Not expected to materially affect DAN/NPC parietal results, but
-    worth a limitations note if these deviations matter for a given analysis.
+    opposite — that was wrong and has been corrected here); (2) until 2026-10-27
+    there was no proximity exclusion for subcortical/cerebellar pairs — moot, since
+    no subcortical voxels were in the CIFTIs (Step 4 note); now 30 mm Euclidean.
+    Not expected to materially affect DAN/NPC parietal results, but worth a
+    limitations note if these deviations matter for a given analysis.
 - **Threshold estimation:** random sample of 100k pairs → empirical r-value distribution
   → compute r_cutoff for each target density.
 - **Target densities:** 0.3%, 0.5%, 1%, 2%, 3%, 5%  (fraction of all n*(n-1)/2 pairs kept)
@@ -359,8 +378,8 @@ Goal: understand which pipeline choices actually shape the individual network ma
 comparing against the current default.
 
 - [ ] **Subcortical/cerebellar voxels in the CM (True/False).** Current default: cortex-only
-      (unintentionally, see Step 4 note). To include them: strip `CIFTI_STRUCTURE_` from the
-      label names written by `make_label_volume()` in `02_surface_cifti.py`, rerun 02–04.
+      (see Step 4 note). Implemented as `PFM_VARIANT=subcort` (rerun 02–05).
+      In progress: ASD sub-01 (2026-10-27, `logs/asd/subcort/`), then the group averages.
       Question: do cortical communities (esp. parietal DAN) shift?
 - [ ] **Reference atlas for labelling (04b).** Candidates: `gordon17`, `caNets_DDnr`
       (DNumRisk group average), an ASD group-average atlas (old fsav5 version in

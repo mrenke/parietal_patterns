@@ -41,7 +41,8 @@ REFS = {
 def prep_labels_for_visualization(labels: np.ndarray,
                                    valid_mask: np.ndarray
                                    ) -> tuple[np.ndarray, np.ndarray]:
-    """Expand (n_valid_nodes,) → two (32492,) arrays, one per hemisphere."""
+    """Expand (n_valid_nodes,) → two (32492,) arrays, one per hemisphere
+    (subcortical grayordinates after the cortex, if any, are dropped)."""
     roi_L = nib.load(HCP_ATLASES / 'L.atlasroi.32k_fs_LR.shape.gii').darrays[0].data.astype(bool)
     roi_R = nib.load(HCP_ATLASES / 'R.atlasroi.32k_fs_LR.shape.gii').darrays[0].data.astype(bool)
     n_L_cortex = roi_L.sum()
@@ -52,7 +53,7 @@ def prep_labels_for_visualization(labels: np.ndarray,
     lh = np.zeros(len(roi_L), dtype=np.int32)
     rh = np.zeros(len(roi_R), dtype=np.int32)
     lh[roi_L] = cifti_labels[:n_L_cortex]
-    rh[roi_R] = cifti_labels[n_L_cortex:]
+    rh[roi_R] = cifti_labels[n_L_cortex:n_L_cortex + roi_R.sum()]
     return lh, rh
 
 

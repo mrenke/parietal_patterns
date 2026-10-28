@@ -112,26 +112,28 @@ ATLAS_NETWORK_NAMES = {
     },
 }
 
-# --- Subcortical structures: aparc+aseg label → (cifti_int, CIFTI_structure_name)
+# --- Subcortical structures: aparc+aseg label → (cifti_int, CIFTI structure name)
+# Bare names (THALAMUS_LEFT) — wb_command silently drops voxels under any other
+# name, e.g. with the CIFTI_STRUCTURE_ prefix. Only used with PFM_VARIANT=subcort.
 # Cerebellar cortex only (8=L, 47=R). WM (7, 46) excluded for simplicity.
 SUBCORTICAL_LABELS = {
-    10: (1,  'CIFTI_STRUCTURE_THALAMUS_LEFT'),
-    11: (2,  'CIFTI_STRUCTURE_CAUDATE_LEFT'),
-    12: (3,  'CIFTI_STRUCTURE_PUTAMEN_LEFT'),
-    13: (4,  'CIFTI_STRUCTURE_PALLIDUM_LEFT'),
-    17: (5,  'CIFTI_STRUCTURE_HIPPOCAMPUS_LEFT'),
-    18: (6,  'CIFTI_STRUCTURE_AMYGDALA_LEFT'),
-    26: (7,  'CIFTI_STRUCTURE_ACCUMBENS_LEFT'),
-     8: (8,  'CIFTI_STRUCTURE_CEREBELLUM_LEFT'),
-    49: (9,  'CIFTI_STRUCTURE_THALAMUS_RIGHT'),
-    50: (10, 'CIFTI_STRUCTURE_CAUDATE_RIGHT'),
-    51: (11, 'CIFTI_STRUCTURE_PUTAMEN_RIGHT'),
-    52: (12, 'CIFTI_STRUCTURE_PALLIDUM_RIGHT'),
-    53: (13, 'CIFTI_STRUCTURE_HIPPOCAMPUS_RIGHT'),
-    54: (14, 'CIFTI_STRUCTURE_AMYGDALA_RIGHT'),
-    58: (15, 'CIFTI_STRUCTURE_ACCUMBENS_RIGHT'),
-    47: (16, 'CIFTI_STRUCTURE_CEREBELLUM_RIGHT'),
-    16: (17, 'CIFTI_STRUCTURE_BRAIN_STEM'),
+    10: (1,  'THALAMUS_LEFT'),
+    11: (2,  'CAUDATE_LEFT'),
+    12: (3,  'PUTAMEN_LEFT'),
+    13: (4,  'PALLIDUM_LEFT'),
+    17: (5,  'HIPPOCAMPUS_LEFT'),
+    18: (6,  'AMYGDALA_LEFT'),
+    26: (7,  'ACCUMBENS_LEFT'),
+     8: (8,  'CEREBELLUM_LEFT'),
+    49: (9,  'THALAMUS_RIGHT'),
+    50: (10, 'CAUDATE_RIGHT'),
+    51: (11, 'PUTAMEN_RIGHT'),
+    52: (12, 'PALLIDUM_RIGHT'),
+    53: (13, 'HIPPOCAMPUS_RIGHT'),
+    54: (14, 'AMYGDALA_RIGHT'),
+    58: (15, 'ACCUMBENS_RIGHT'),
+    47: (16, 'CEREBELLUM_RIGHT'),
+    16: (17, 'BRAIN_STEM'),
 }
 
 

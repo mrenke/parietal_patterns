@@ -14,8 +14,8 @@ matrices (each with its own r-cutoff, local pairs zeroed) — a 0 there means
 
 Averaging: per row-chunk, each subject's Pearson r is Fisher-z transformed,
 averaged across subjects (equal weight per subject, regardless of frame count),
-and back-transformed. Then, as in step 03: same-hemisphere surface pairs
-< 30 mm zeroed, r-cutoffs per density estimated from 100k random pairs (same
+and back-transformed. Then, as in step 03: same-hemisphere surface pairs and
+pairs involving a subcortical voxel < 30 mm zeroed, r-cutoffs per density estimated from 100k random pairs (same
 seed/sampling as step 03), one sparse CSR per density. The dense matrix is
 never stored.
 
@@ -152,7 +152,7 @@ def estimate_thresholds(ts_list, coords, hemi_ids, target_densities,
     dist_s   = np.linalg.norm(coords[i_s] - coords[j_s], axis=1)
     same_hem = hemi_ids[i_s] == hemi_ids[j_s]
     both_srf = (hemi_ids[i_s] < 2) & (hemi_ids[j_s] < 2)
-    is_local = (dist_s < CM_DIST_CUTOFF_MM) & same_hem & both_srf
+    is_local = (dist_s < CM_DIST_CUTOFF_MM) & (same_hem | ~both_srf)
 
     local_frac = is_local.mean()
     print(f'  Estimated local-pair fraction: {100*local_frac:.1f}%')
@@ -192,7 +192,7 @@ def compute_sparse_cms(ts_list, coords, hemi_ids, thresholds,
         dist = cdist(coords[start:end], coords)
         same_hem = hemi_ids[start:end, None] == hemi_ids[None, :]
         both_srf = (hemi_ids[start:end] < 2)[:, None] & (hemi_ids < 2)[None, :]
-        r[(dist < CM_DIST_CUTOFF_MM) & same_hem & both_srf] = 0.0
+        r[(dist < CM_DIST_CUTOFF_MM) & (same_hem | ~both_srf)] = 0.0
 
         upper = j_all[None, :] > np.arange(start, end, dtype=np.int32)[:, None]
         for d, cutoff in thresholds.items():

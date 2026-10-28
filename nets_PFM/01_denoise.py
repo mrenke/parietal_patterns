@@ -20,7 +20,7 @@ from scipy.ndimage import gaussian_filter
 from scipy.signal import butter, filtfilt
 
 sys.path.insert(0, str(Path(__file__).parent))
-from config import (FMRIPREP, OUTPUT_ROOT, SESSION, TASK, TR, get_runs,
+from config import (FMRIPREP, DENOISED_ROOT, SESSION, TASK, TR, get_runs,
                     FD_THRESHOLD, BP_LOW, BP_HIGH, COV_SD_THRESH)
 
 
@@ -202,7 +202,7 @@ def denoise_run(subject: str, run: int, out_dir: Path) -> None:
 # ---------------------------------------------------------------------------
 
 def main(subject: str) -> None:
-    out_dir = OUTPUT_ROOT / subject / 'denoised'
+    out_dir = DENOISED_ROOT / subject / 'denoised'
     out_dir.mkdir(parents=True, exist_ok=True)
 
     skipped = []
