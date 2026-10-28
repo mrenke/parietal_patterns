@@ -1,2 +1,3 @@
-*.log
-*.csv
+# Pipeline logs (per subject / batch) — local only, not versioned
+*
+!.gitignore

@@ -6,7 +6,7 @@ Builds a group-average connectome from the individual concatenated CIFTI
 timeseries (step 02 output) and thresholds it exactly like 03_vertex_cm.py,
 so the result can go through 04_infomap.py / 04b_relabel.py / 05_plot.py as a
 pseudo-subject (default label: sub-average). Intended use: a dataset-specific
-group network atlas, e.g. as a reference for 04b (cf. caNets_DDnr for DNumRisk).
+group network atlas, e.g. as a reference for 04b (cf. ca19magjudgeDDnr for DNumRisk).
 
 Why not average the step-03 outputs: those are per-subject *thresholded* sparse
 matrices (each with its own r-cutoff, local pairs zeroed) — a 0 there means
@@ -56,7 +56,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from config import (OUTPUT_ROOT, SESSION, ALL_SUBJECTS, GROUP_NAMES, get_groups,
-                    EXCLUDE_SUBJECTS,
+                    EXCLUDE_SUBJECTS, INCLUDE_SUBCORTICAL,
                     INFOMAP_DENSITIES, CM_CHUNK_SIZE, CM_DIST_CUTOFF_MM)
 
 # get_node_info from step 03 (module name starts with a digit → importlib)
@@ -273,6 +273,10 @@ if __name__ == '__main__':
                         help="Output label → sub-<label> (default 'average', "
                              "or 'average-<group>' with --group)")
     args = parser.parse_args()
+    if INCLUDE_SUBCORTICAL:
+        # Subcortical voxels are in each subject's native space (different voxel
+        # sets) → no per-node correspondence to average over.
+        sys.exit('07 is cortex-only: unset PFM_VARIANT (subcortical → 08_subcort_assign.py)')
 
     candidates = args.subjects or ALL_SUBJECTS
     excluded = set(args.exclude) | set(EXCLUDE_SUBJECTS)

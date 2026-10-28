@@ -10,7 +10,7 @@ Steps:
   02  surface + CIFTI assembly
   03  vertex-wise correlation matrix
   04  Infomap (Gordon17 reference)
-  04b relabel with caNets_DDnr reference
+  04b relabel with each reference in config.REFERENCES
 
 Usage:
   python run_pipeline.py                    # all subjects, default dataset
@@ -48,12 +48,14 @@ os.environ['PFM_DATASET'] = _pre_args.dataset
 # (sub-XX_pipeline.log) don't append onto DNumRisk's.
 if _pre_args.dataset != 'dnumrisk':
     LOG_DIR = LOG_DIR / _pre_args.dataset
+# Same for pipeline variants (PFM_VARIANT, see config.py)
+if os.environ.get('PFM_VARIANT'):
+    LOG_DIR = LOG_DIR / os.environ['PFM_VARIANT']
 
-from config import (ATLAS_DIR, OUTPUT_ROOT, DENOISED_ROOT, PLOT_DIR, SESSION, TASK,
+from config import (OUTPUT_ROOT, DENOISED_ROOT, PLOT_DIR, SESSION, TASK,
+                     REFERENCES, atlas_path,
                      ALL_SUBJECTS, get_runs)
 
-REF_GORDON = ATLAS_DIR / 'gordon17_space-fsLR_den-32k_cortex.npz'
-REF_CANETS = ATLAS_DIR / 'caNets_DDnr-magjudge-task-average-from-fsav5_space-fsLR_den-32k_cortex.npz'
 
 CONDA_ENV   = 'numrefields'
 PYTHON      = ['conda', 'run', '--no-capture-output', '-n', CONDA_ENV, 'python', '-u']
@@ -147,11 +149,11 @@ def is_done(subject: str, step: str) -> bool:
         '04b': all(
             (sub_dir / 'networks' /
              f'{stem}_consensus_ref-{r}_communities.npz').exists()
-            for r in ('gordon17', 'caNets_DDnr')
+            for r in REFERENCES
         ),
         '05':  all(
             (PLOT_DIR / f'{subject}_ref-{r}_networks.png').exists()
-            for r in ('gordon17', 'caNets_DDnr')
+            for r in REFERENCES
         ),
         '06':  all(
             (sub_dir / 'anat' /
@@ -175,9 +177,8 @@ def step_cmds(subject: str) -> dict:
         '04':  PYTHON + [str(SCRIPT_DIR / '04_infomap.py'), n],
         '04b': [
             PYTHON + [str(SCRIPT_DIR / '04b_relabel.py'), n,
-                      '--ref', str(REF_GORDON), '--ref-name', 'gordon17'],
-            PYTHON + [str(SCRIPT_DIR / '04b_relabel.py'), n,
-                      '--ref', str(REF_CANETS), '--ref-name', 'caNets_DDnr'],
+                      '--ref', str(atlas_path(r)), '--ref-name', r]
+            for r in REFERENCES
         ],
         '05':  PYTHON + [str(SCRIPT_DIR / '05_plot.py'), n],
         '06':  PYTHON + [str(SCRIPT_DIR / '06_comp_indVertexArea.py'), n],
@@ -189,7 +190,7 @@ def step_cmds(subject: str) -> dict:
 # ---------------------------------------------------------------------------
 
 def main(subjects: list[int], steps: list[str], force: bool = False) -> None:
-    LOG_DIR.mkdir(exist_ok=True)
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
     t_pipeline = time.perf_counter()
 
     # Master log

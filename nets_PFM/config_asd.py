@@ -20,10 +20,12 @@ ANAT_DIR_OVERRIDE   = {}
 OUTPUT_ROOT = Path('/mnt_AdaBD_largefiles/Data/DNumRisk_Data/ds-asd'
                     '/derivatives/pfm_fslr')
 
-# Reference atlases (gordon17, caNets_DDnr) are dataset-independent labelling
+# Reference atlases (gordon17, ca19magjudgeDDnr) are dataset-independent labelling
 # references already in fsLR 32k space — reuse DNumRisk's copy rather than
 # duplicating them here.
 ATLAS_DIR = Path('/mnt_03/ds-dnumrisk/derivatives/pfm_fslr/atlases')
+# 04b / 05 / 08 run for each (names: see config.py; files: config.atlas_path)
+REFERENCES = ['gordon17', 'ca19', 'ca19magjudgeDDnr', 'gordon17chaseASDC', 'ca19chaseASDC']
 
 PLOT_DIR = Path('/mnt_AdaBD_largefiles/Data/DNumRisk_Data/ds-asd'
                  '/plots_and_ims/nets_PFM')
@@ -86,45 +88,6 @@ COV_SD_THRESH = 0.5
 
 # --- Smoothing ---
 SMOOTH_SIGMA = 2.55
-
-# --- Network label names by reference atlas ---
-ATLAS_NETWORK_NAMES = {
-    'gordon17': {
-        0:  'Unassigned',
-        1:  'Default',
-        2:  'LatVis',
-        3:  'FrontPar',
-        4:  'MedVis',
-        5:  'DorsAttn',
-        6:  'Premotor',
-        7:  'Language',
-        8:  'Salience',
-        9:  'CingOperc',
-        10: 'HandSM',
-        11: 'FaceSM',
-        12: 'Auditory',
-        13: 'AntMTL',
-        14: 'PostMTL',
-        15: 'ParMemory',
-        16: 'Context',
-        17: 'FootSM',
-    },
-    'caNets_DDnr': {
-        0:  'Unassigned',
-        1:  'Visual1',
-        2:  'Visual2',
-        3:  'Somatomotor',
-        4:  'Cingulo-Opercular',
-        5:  'Dorsal-attention',
-        6:  'Language',
-        7:  'Frontoparietal',
-        8:  'Auditory',
-        9:  'Default',
-        10: 'Posterior-Multimodal',
-        11: 'Ventral-Multimodal',
-        12: 'Orbito-Affective',
-    },
-}
 
 # --- Subcortical structures: aparc+aseg label → (cifti_int, CIFTI structure name)
 # Bare names (THALAMUS_LEFT) — wb_command silently drops voxels under any other

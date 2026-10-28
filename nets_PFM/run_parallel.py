@@ -18,6 +18,7 @@ Usage:
   python run_parallel.py --dataset asd                       # all subjects, steps 04 04b 05
   python run_parallel.py --dataset asd --jobs 12 --start 10
   python run_parallel.py --dataset asd --subjects 1 2 3 --steps 04
+  PFM_VARIANT=subcort python run_parallel.py --dataset asd --steps 02 --jobs 20
 """
 import argparse
 import os
@@ -73,7 +74,7 @@ def main() -> None:
     n_cpu = os.cpu_count() or 1
     jobs = args.jobs or max(1, min(n_cpu - 1, int(0.85 * ram / args.gb_per_job)))
 
-    log_dir = SCRIPT_DIR / 'logs' / args.dataset / 'parallel'
+    log_dir = SCRIPT_DIR / 'logs' / args.dataset / os.environ.get('PFM_VARIANT', '') / 'parallel'
     log_dir.mkdir(parents=True, exist_ok=True)
 
     print(f'{datetime.now():%Y-%m-%d %H:%M:%S}  dataset={args.dataset}  '

@@ -36,6 +36,10 @@ PFM_DATASET=asd PFM_VARIANT=subcort python 02_surface_cifti.py sub-01
 - In 04b, subcortical voxels have no reference label (the atlases are cortex-only): they
   don't vote, but get the label of the Infomap community they belong to. The 30 mm²
   patch filter and 05's surface plots only touch the cortex part.
+- ⚠️ In 03 the cortex coordinates are the fsLR *template* midthickness, the voxels are in
+  the subject's T1w space → the 30 mm cortex↔subcortex exclusion compares different
+  spaces (cortex-cortex and voxel-voxel distances are fine). 07 refuses the variant
+  (voxel sets differ per subject). For subcortical labels prefer step 08 (below).
 
 Each `config_<dataset>.py` defines the same fields (`BIDS_ROOT`, `OUTPUT_ROOT`,
 `ATLAS_DIR`, `PLOT_DIR`, `SESSION`, `TASK`, `TR`, `ALL_SUBJECTS`, plus a
@@ -50,7 +54,7 @@ Each `config_<dataset>.py` defines the same fields (`BIDS_ROOT`, `OUTPUT_ROOT`,
   (~4–5 GB/subject). `/mnt_asd/ds-asd/derivatives/pfm_fslr` is a symlink to it.
   Rule: **inputs** (fmriprep, freesurfer) live on `/mnt_asd`, **PFM outputs** on largefiles.
 - **Reference atlases reused** from DNumRisk's `pfm_fslr/atlases/` (gordon17,
-  caNets_DDnr) — these are dataset-independent labelling references, not duplicated.
+  ca19magjudgeDDnr) — these are dataset-independent labelling references, not duplicated.
 - **FreeSurfer:** only `sub-XX/surf/{lh,rh}.sphere.reg` synced (2026-10-26) from
   `sciencecluster:/shares/zne.uzh/mrenke/ds-asd/derivatives/freesurfer` into
   `/mnt_asd/ds-asd/derivatives/freesurfer` — same recon-all run as fMRIPrep's
@@ -239,10 +243,35 @@ The full ~90k × 90k dense matrix is never materialised — computed in row-chun
 - **Network labelling:** `--ref` flag accepts a `.npz` atlas with `labels`
   (n_all_vertices,) and `hemi` (n_all_vertices,) arrays. Medial-wall vertices
   are filtered using HCP atlas ROI masks. For each community the plurality
-  reference label is assigned. Reference atlases available at:
-  `/mnt_03/ds-dnumrisk/derivatives/pfm_fslr/atlases/`
-    - `gordon17_space-fsLR_den-32k_cortex.npz`
-    - `caNets_DDnr-magjudge-task-average-from-fsav5_space-fsLR_den-32k_cortex.npz`
+  reference label is assigned. See "Reference atlases" below.
+
+### Reference atlases (04b labelling)
+Shared dir `/mnt_03/ds-dnumrisk/derivatives/pfm_fslr/atlases/` (both datasets), file
+`<ref>_space-fsLR_den-32k_cortex.npz` (`config.atlas_path`), provenance in its `README.md`.
+Names `<label set><task><data source>`, letters/digits only (a BIDS label value may not
+contain `_`/`-`). The label set prefix (`gordon17`, `ca19`) gives network IDs/names
+(`config.ATLAS_NETWORK_NAMES[ref]` resolves any ref by prefix) and the 05 colormap.
+
+| ref | what |
+|---|---|
+| `gordon17` | Gordon et al. 2017 group networks |
+| `ca19` | Cole-Anticevic partition, original (Ji et al. 2019, *NeuroImage*; CAB-NP), from `hcp_utils` |
+| `ca19magjudgeDDnr` | DNumRisk magjudge group average (fsav5 pipeline), ca19-labelled — DD paper |
+| `gordon17chaseASDC` / `ca19chaseASDC` | ds-asd chase group average (all 97: ASD + Control), from `sub-average` 04b |
+
+- Which refs 04b / 05 / 08 / `run_pipeline.py` use: `REFERENCES` in `config_<dataset>.py`.
+- New refs: `make_ref_atlas.py` (`--ca19`, or `--subject average --ref gordon17 --name …`).
+- ⚠️ Don't label an average with a ref built from itself (circular: `sub-average` with
+  `*chaseASDC` reproduces its own labels, ~95% identical after a 2nd patch filter).
+  `sub-average-ASD` / `-Control` with `*chaseASDC` is fine.
+- ca19chaseASDC lacks Visual1 + Orbito-Affective (Posterior-Multimodal 24 vertices):
+  plurality labelling absorbs small networks; gordon17chaseASDC lacks PostMTL.
+- **Renamed 2026-10-28:** `caNets_DDnr` → `ca19magjudgeDDnr` everywhere — atlas files
+  (`caNets_DDnr-magjudge-task-average-from-fsav5_*` → `ca19magjudgeDDnr_*`), all
+  `ref-…` outputs (DNumRisk 66 subjects + plots, ASD), phenotype CSVs, code, notebooks.
+  NOT renamed: finished figures/tables in `ds-dnumrisk/paper_materials/` and
+  `thesis_materials/` (may be linked from manuscripts) — re-running the notebooks now
+  writes them under the new name.
 
 ### `04b_relabel.py` — Re-label without re-running Infomap
 Loads existing per-density `modules` arrays from `04_infomap.py` output,
@@ -295,6 +324,28 @@ python 07_group_avg_cm.py --group ASD      # → sub-average-ASD
 python 04_infomap.py average && python 04b_relabel.py average --ref ... && python 05_plot.py average
 ```
 
+### `08_subcort_assign.py` — Subcortical voxels → cortical networks (winner-take-all)
+Greene et al. 2020 approach: cortex is mapped on its own (default cortex-only 04 + 04b);
+each subcortical voxel gets the network whose cortical vertices it correlates with most
+(mean Fisher z per network, vertices < 30 mm away ignored). Why not Infomap with
+subcortical nodes: subcortical BOLD is weak, the global density thresholds are filled by
+cortico-cortical edges → ASD sub-01: only 62% of striatal voxels assigned even at 5%
+(cortex 100%), ~40% unassigned in the consensus.
+- Needs the subcort CIFTI (02 with `PFM_VARIANT=subcort`) + the default run's 04b labels.
+  Run without `PFM_VARIANT`; reads/writes `<OUTPUT_ROOT>_subcort/sub-XX/`.
+- Distances: subject's own midthickness resampled to fsLR 32k (T1w space, saved in
+  `anat/`), so vertices and voxels share a space (putamen → nearest cortex ≈ 8 mm, sub-01).
+- Output `networks/*_subcort-wta_ref-{ref}.npz` (labels, per-network z, structure, ijk),
+  `*_dseg.nii.gz` (label volume, T1w BOLD grid), `*_summary.csv` (structure × network).
+- Per subject only (no group average: native-space voxels). Group comparisons → per-
+  structure network proportions per subject; spatial group maps would need the labels
+  warped to MNI (fMRIPrep T1w→MNI xfm exists; ANTs not installed on the VM).
+- ASD sub-01 (first look, 2026-10-28): caudate → Frontoparietal (both refs),
+  putamen → Auditory/Salience (gordon17) or Auditory/Frontoparietal (ca19magjudgeDDnr).
+```
+PFM_DATASET=asd python 08_subcort_assign.py 1 2 3 [--ref ca19magjudgeDDnr]
+```
+
 ### Optional utility: `03_corr_matrix.py`
 Parcellated CM (parcel-to-parcel, using a `.dlabel.nii` atlas). Not used for
 Infomap network detection, but useful for seed-based connectivity analyses,
@@ -327,7 +378,7 @@ QC, or comparison with other datasets. Requires `--parc` at runtime.
                 *_cm_meta.npz               (coords, hemi_ids, valid_mask)
     networks/   *_density-{d}_ref-{name}_communities.npz
                 *_consensus_ref-{name}_communities.npz
-  atlases/      reference atlases (gordon17, caNets_DDnr)
+  atlases/      reference atlases (see "Reference atlases") + README.md
 ```
 
 ## Analysis Notebooks
@@ -335,7 +386,7 @@ QC, or comparison with other datasets. Requires `--parc` at runtime.
 ### `npc_net_ana.ipynb` — NPC Network Sizes & DAN Patch Topology
 
 > **Final reported version (DD paper, Fig. 2):** `prep_results/paperDD_neuralFig2.ipynb` —
-> NPC Visual2/DAN composition + group-average DAN patches, `caNets_DDnr`, **66 subjects**
+> NPC Visual2/DAN composition + group-average DAN patches, `ca19magjudgeDDnr`, **66 subjects**
 > (sub-05 included on 5 runs). Use that notebook's numbers for reporting; this one is the
 > exploratory full breakdown.
 
@@ -350,7 +401,7 @@ out — sub-05 (5 runs) is included; the p-values below may predate that:
 
 **2. DAN patch topology (spatially contiguous sub-regions)**
 - Decomposes each subject's DAN into spatially contiguous patches (connected components on the fsLR 32k surface graph).
-- Reference patch names derived from the group-average `caNets_DDnr` atlas: parietal-lateral, frontal-lateral, frontal-medial-dorsal, temporal, frontal-insula, frontal-medial patches in each hemisphere. Patches < 10 vertices in the atlas are excluded.
+- Reference patch names derived from the group-average `ca19magjudgeDDnr` atlas: parietal-lateral, frontal-lateral, frontal-medial-dorsal, temporal, frontal-insula, frontal-medial patches in each hemisphere. Patches < 10 vertices in the atlas are excluded.
 - Each subject patch assigned to the nearest reference patch by centroid distance (Euclidean on midthickness coordinates).
 - Size metric: summed individual anatomy area (cm²) per reference patch per subject.
 - Main comparison: bilateral parietal DAN patch (L_parietal-lateral + R_parietal-lateral summed).
@@ -367,7 +418,7 @@ out — sub-05 (5 runs) is included; the p-values below may predate that:
 - [x] `04b_relabel.py` — written (relabel only, no Infomap re-run)
 - [x] `run_pipeline.py` — written (batch runner, completion checks, frame table)
 - [x] Tested end-to-end on sub-01
-- [x] Reference atlases in place (gordon17, caNets_DDnr) in fsLR 32k .npz format
+- [x] Reference atlases in place (gordon17, ca19magjudgeDDnr) in fsLR 32k .npz format
 - [x] Pipeline running on all subjects (1–66) overnight
 - [x] `npc_net_ana.ipynb` — NPC network sizes + DAN patch topology, group comparisons (DD vs TD)
 
@@ -379,11 +430,20 @@ comparing against the current default.
 
 - [ ] **Subcortical/cerebellar voxels in the CM (True/False).** Current default: cortex-only
       (see Step 4 note). Implemented as `PFM_VARIANT=subcort` (rerun 02–05).
-      In progress: ASD sub-01 (2026-10-27, `logs/asd/subcort/`), then the group averages.
-      Question: do cortical communities (esp. parietal DAN) shift?
-- [ ] **Reference atlas for labelling (04b).** Candidates: `gordon17`, `caNets_DDnr`
-      (DNumRisk group average), an ASD group-average atlas (old fsav5 version in
-      `asd_pfm_ana/avg_network_atlas_fsav5_01.ipynb` looks odd — DAN only at 3% threshold).
+      Done for ASD sub-01 (2026-10-27, `logs/asd/subcort/`). Question: do cortical
+      communities (esp. parietal DAN) shift? Caveat: cortex↔subcortex 30 mm exclusion
+      uses mismatched spaces (see "Pipeline variants"); no group averages possible.
+- [ ] **Subcortical labels: Infomap vs winner-take-all (`08_subcort_assign.py`).**
+      Infomap with subcortical nodes leaves ~40% of the striatum unassigned (sub-01);
+      WTA (Greene et al. 2020) labels every voxel from the cortex-only map, leaving the
+      cortex untouched. Interest: **striatum (caudate, putamen, accumbens)** — e.g. ASD vs
+      Control network proportions per structure. Open: reference (gordon17 splits into
+      more networks), a confidence margin (best vs 2nd-best z), minimum data per subject.
+      Needs 04/04b for all subjects first; subcort 02 batch started 2026-10-28.
+- [ ] **Reference atlas for labelling (04b).** Now available: `gordon17`, `ca19` (original),
+      `ca19magjudgeDDnr` (DNumRisk), `gordon17chaseASDC` / `ca19chaseASDC` (ASD cohort,
+      fsLR; see "Reference atlases"). Old fsav5 ASD average in
+      `asd_pfm_ana/avg_network_atlas_fsav5_01.ipynb` looks odd (DAN only at 3%).
       Cheap to vary: 04b takes seconds per subject.
 - [ ] **New fsLR group-average atlas vs old fsav5 one** (`07_group_avg_cm.py`, all / ASD /
       Control). Differences confound denoising (Friston-24+GSR vs 36P), density range

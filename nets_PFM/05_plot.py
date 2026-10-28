@@ -2,14 +2,11 @@
 """
 Step 5 — Plot individual network maps and save to shared plot folder.
 
-Generates one 2×2 figure (L/R × lateral/medial) per reference atlas:
-  - gordon17
-  - caNets_DDnr
+Generates one 2×2 figure (L/R × lateral/medial) per reference atlas in
+config.REFERENCES (colormap from its label set: gordon17 / ca19).
 
-Saved to:
-  /mnt_AdaBD_largefiles/.../plots_and_ims/nets_PFM/
-    sub-XX_ref-gordon17_networks.png
-    sub-XX_ref-caNets_DDnr_networks.png
+Saved to PLOT_DIR:
+    sub-XX_ref-<ref>_networks.png
 
 Usage:
   python 05_plot.py sub-01
@@ -25,13 +22,10 @@ from pathlib import Path
 from neuromaps.datasets import fetch_atlas
 
 sys.path.insert(0, str(Path(__file__).parent))
-from config import OUTPUT_ROOT, HCP_ATLASES, SESSION, PLOT_DIR
+from config import OUTPUT_ROOT, HCP_ATLASES, SESSION, PLOT_DIR, REFERENCES, label_set
 from utils_01 import get_gordon17_cmap, get_CANets_cmap
 
-REFS = {
-    'gordon17':   {'vmax': 17, 'cmap': None},   # filled below
-    'caNets_DDnr': {'vmax': 12, 'cmap': None},
-}
+LABEL_SET_VMAX = {'gordon17': 17, 'ca19': 12}
 
 
 # ---------------------------------------------------------------------------
@@ -117,13 +111,10 @@ def main(subject: str) -> None:
         raise FileNotFoundError(f'Run 03_vertex_cm.py first: {meta_path}')
     valid_mask = np.load(meta_path)['valid_mask']
 
-    # Colormaps
-    cmap_gordon, _ = get_gordon17_cmap()
-    cmap_ca        = get_CANets_cmap()
-    REFS['gordon17']['cmap']    = cmap_gordon
-    REFS['caNets_DDnr']['cmap'] = cmap_ca
+    # Colormaps per label set
+    cmaps = {'gordon17': get_gordon17_cmap()[0], 'ca19': get_CANets_cmap()}
 
-    for ref_name, cfg in REFS.items():
+    for ref_name in REFERENCES:
         net_path = (OUTPUT_ROOT / subject / 'networks' /
                     f'{subject}_{SESSION}_space-fsLR32k'
                     f'_consensus_ref-{ref_name}_communities.npz')
@@ -135,8 +126,8 @@ def main(subject: str) -> None:
         net_labels = np.load(net_path)['modules']  # ['network_labels']
         lh, rh     = prep_labels_for_visualization(net_labels, valid_mask)
 
-        fig = plot_networks(subject, ref_name, lh, rh,
-                            cfg['cmap'], cfg['vmax'], fslr)
+        fig = plot_networks(subject, ref_name, lh, rh, cmaps[label_set(ref_name)],
+                            LABEL_SET_VMAX[label_set(ref_name)], fslr)
 
         out = PLOT_DIR / f'{subject}_ref-{ref_name}_networks.png'
         fig.savefig(out, dpi=150, bbox_inches='tight')
